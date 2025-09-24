@@ -32,7 +32,7 @@ def _print_xsatInfo():
 def _get_template():
     template = """#include <Python.h>
 #include "xsat.h"
-
+#include <math.h>
 static PyObject* R(PyObject* self, PyObject *args){
 
   %(var_declarations)s
