@@ -99,5 +99,3 @@ clean:
 
 
 .PHONY: copy gen clean compile compile_square test
-
-

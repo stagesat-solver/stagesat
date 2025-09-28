@@ -63,24 +63,24 @@ double DNE_f32(float x, float y) {
 }
 
 double DLE(double x,double y){
-    return x<=y?0.0:ulp(x,y);
+    return x <= y ? 0.0 : ulp(x,y);
 }
 
 double DLT(double x,double y){
-  return x<y?0.0:ulp(x,y)+1.0;
+  return x < y ? 0.0 : ulp(x,y) + 1.0;
 }
 
 double DGE(double x,double y)  {
-   return DLE(y,x);
+   return DLE(y, x);
 }
 double  DGT(double x,double y)  {
-  return DLT(y,x);
+  return DLT(y, x);
 }
 double DEQ(double x, double y){
-  return ulp(x,y);
+  return ulp(x, y);
 }
 double  DNE(double x,double y) {
-  return  (x==y)?1.0:0.0;
+  return (x == y) ? 1.0 : 0.0;
 }
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -88,8 +88,8 @@ double MAX(double a, double b) {
   if (!isfinite(a) || !isfinite(b)) return INFINITY;
   return (((a) > (b)) ? (a) : (b));
 }
-double  BAND(double x,double y){return x+y;}
-double  BOR(double x,double y){return x*y;}
+double  BAND(double x, double y){return x + y;}
+double  BOR(double x, double y){return x * y;}
 
 //#endif
 float TR32(double x){

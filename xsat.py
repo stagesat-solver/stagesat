@@ -43,8 +43,8 @@ def create_typed_input(X, symbolTable):
 def get_parser():
     parser = argparse.ArgumentParser(prog='Xsat')
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 2.0.0')
-    parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=3)
-    parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=30)
+    parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=50)
+    parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=1)
     parser.add_argument('--method', help='Local minimization procedure', default='powell',
                         choices=['powell', 'slsqp', 'cg', 'l-bfgs-b', 'cobyla', 'tnc', 'bfgs', 'nelder-mead',
                                  'noop_min']
@@ -53,8 +53,8 @@ def get_parser():
                         default=False)
     parser.add_argument('--showResult', help='show the basinhopping output (default:false)', action='store_true',
                         default=False)
-    parser.add_argument('--stepSize', help='parameter of basinhopping', type=float, default=1.0)
-    parser.add_argument('--round2_stepsize', help='parameter of basinhopping', type=float, default=1.0)
+    parser.add_argument('--stepSize', help='parameter of basinhopping', type=float, default=10.0)
+    parser.add_argument('--round2_stepsize', help='parameter of basinhopping', type=float, default=10.0)
     parser.add_argument('--verify', help='verify the model', action='store_true', default=False)
     parser.add_argument('--verify2', help='verify the model (method 2)', action='store_true', default=False)
     parser.add_argument('--showModel', help='show the model as a var->value mapping', action='store_true',
@@ -72,12 +72,12 @@ def get_parser():
 
     parser.add_argument('--startPoint', help='start point in a single dimension', action='store', type=float,
                         default=1.0)
-    parser.add_argument('--round2_threshold', help='threshold_low for round2', action='store', type=float, default=1e-12)
+    parser.add_argument('--round2_threshold', help='threshold_low for round2', action='store', type=float, default=8e-11)
     parser.add_argument('--round3_threshold', help='threshold  for round3', action='store', type=float, default=15)
     parser.add_argument("--multi", help="multi-processing (default: true)", default=True, action='store', type=str2bool)
     # parser.add_argument("--single", help="single processor  (default: true)",default=True,action='store')
     # parser.add_argument("--round2", help="activate round2 when unsat (default: false)",default=False,action='store_true')
-    parser.add_argument("--round2_niter", help="niter for round2", action='store', type=int, required=False, default=50)
+    parser.add_argument("--round2_niter", help="niter for round2", action='store', type=int, required=False, default=200)
     parser.add_argument("--round3_niter", help="niter for round3", action='store', type=int, required=False, default=30)
     parser.add_argument("--round3_stepsize", help="stepsize for round3", action='store', type=float, required=False,
                         default=5.0)
