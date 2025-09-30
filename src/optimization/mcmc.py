@@ -37,8 +37,7 @@ def noop_min(fun, x0, args, **options):
     return op.OptimizeResult(x=x0, fun=fun(x0), success=True, nfev=1)
 
 def scale(X, i):
-    return X ** ((i + 1) % 4)
-    # return X
+    return X ** (i + 1)
 
 def R_quick(X,i,f):
     return f(* scale(X,i))
@@ -99,7 +98,7 @@ def mcmc(args, i):
     for round_num in range(args.nStartOver):
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
-        sp = np.zeros(foo_square.dim) + args.startPoint + i + np.random.uniform(-0.05, 0.05, foo_square.dim)
+        sp = np.zeros(foo_square.dim) + args.startPoint + (i % 4) + np.random.uniform(-0.05, 0.05, foo_square.dim)
         res = op.basinhopping(lambda X: R_quick(X, i, foo_square.R), sp, niter=args.niter, stepsize=args.stepSize,
                               minimizer_kwargs=_minimizer_kwargs)
         if args.showResult:
@@ -112,24 +111,19 @@ def mcmc(args, i):
         if res.fun >= args.round2_threshold:
             continue
         ########################################################################################
-        rec = foo_ulp.R(*X_star)
         if args.showTime:
             print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         sp2 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
-        def obj_near2(N):
-            N_int = np.round(N).astype(int)
-            X2_moved = np.array([
-                nth_fp_dispatchers[j](n_val, x_base_val)
-                for j, (n_val, x_base_val) in enumerate(zip(N_int, sp2))
-            ])
-            return foo_ulp.R(*X2_moved)
-        res_round2 = op.basinhopping(obj_near2, np.zeros(foo_ulp.dim), niter=args.round2_niter,
-                                     stepsize=args.round2_stepsize, minimizer_kwargs=_minimizer_kwargs,
-                                     callback=_callback_global)
+        res_round2 = op.basinhopping(
+            lambda X: foo_ulp.R(*scale(X, i)),
+            sp2,
+            niter=args.round2_niter,
+            stepsize=args.round2_stepsize,
+            minimizer_kwargs=_minimizer_kwargs,
+            callback=_callback_global
+        )
         R_star = res_round2.fun
-        X_star = np.array([
-            nth_fp_dispatchers[j](int(np.round(n_val)), x_base_val)
-            for j, (n_val, x_base_val) in enumerate(zip(res_round2.x, sp2))])
+        X_star = scale(tr_help(res_round2.x), i)
         if R_star < best_R_star:
             best_R_star = R_star
             best_X_star = X_star
@@ -138,6 +132,29 @@ def mcmc(args, i):
             break
         if res_round2.fun >= args.round3_threshold:
             continue
+        ########################################################################################
+        if args.showTime:
+            print("[Xsat] round3_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        sp3 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
+        def obj_near3(N):
+            X3_moved = np.array([
+                nth_fp_dispatchers[j](n_val, x_base_val)
+                for j, (n_val, x_base_val) in enumerate(zip(N, sp3))
+            ])
+            return foo_ulp.R(*X3_moved)
+        res_round3 = op.basinhopping(obj_near3, np.zeros(foo_ulp.dim), niter=args.round3_niter,
+                                     stepsize=args.round3_stepsize, minimizer_kwargs=_minimizer_kwargs,
+                                     callback=_callback_global)
+        R_star = res_round3.fun
+        X_star = np.array([
+            nth_fp_dispatchers[j](n_val, x_base_val)
+            for j, (n_val, x_base_val) in enumerate(zip(res_round3.x, sp3))])
+        if R_star < best_R_star:
+            best_R_star = R_star
+            best_X_star = X_star
+            print(f"//////////////////////////////R3 found a best_R_star: {best_R_star} + R1: {res.fun}")
+        if best_R_star == 0:
+            break
     return best_X_star, best_R_star
 
 
@@ -158,3 +175,25 @@ def ulp_py(x: float, y: float) -> float:
     distance = abs(a - b)
     return float(distance)
 
+
+def double_to_parts(d):
+    # Get the 64-bit representation
+    bits = struct.unpack('>Q', struct.pack('>d', d))[0]
+    sign = (bits >> 63) & 1
+    # Exponent: bits 62-52 (11 bits)
+    exponent = (bits >> 52) & 0x7FF
+    # Mantissa: bits 51-0 (52 bits)
+    mantissa = bits & 0xFFFFFFFFFFFFF
+    # Convert to hex string (13 hex digits for 52 bits)
+    mantissa_hex = format(mantissa, '013x')
+    return sign, exponent, mantissa_hex
+
+def smt_fp_to_double(sign: int, exponent_str: str, mantissa_hex_str: str) -> float:
+    exponent = int(exponent_str, 2)
+    mantissa = int(mantissa_hex_str, 16)
+    as_uint64 = (sign << 63) | (exponent << 52) | mantissa
+    packed = struct.pack('Q', as_uint64)
+    return struct.unpack('d', packed)[0]
+
+const = smt_fp_to_double(0, "00000000000", "8000000000000")
+const2 = smt_fp_to_double(0, "01101101010", "6849b86a12b9b")

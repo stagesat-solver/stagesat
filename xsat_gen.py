@@ -155,12 +155,17 @@ def _gen(expr_z3, symbolTable, cache, result):
                         str_ret = str(sympy.Float(str(expr_z3), 17))
                     except ValueError:
                         # Handle other edge cases
-                        offset = 127 if expr_z3.sort() == z3.Float32() else 1023
-                        # Z3 new version needs the offset to be taken into consideration
-                        expr_z3_exponent = expr_z3.exponent_as_long() - offset
-                        str_ret = str(sympy.Float(
-                            (-1) ** float(expr_z3.sign()) * float(str(expr_z3.significand())) * 2 ** (expr_z3_exponent),
-                            17))
+                        is_float32 = expr_z3.sort() == z3.Float32()
+                        offset = 127 if is_float32 else 1023
+                        exponent_raw = expr_z3.exponent_as_long()
+                        if exponent_raw == 0:
+                            expr_z3_exponent = -126 if is_float32 else -1022
+                            significand = float(str(expr_z3.significand()))
+                        else:
+                            expr_z3_exponent = exponent_raw - offset
+                            significand = 1.0 + float(str(expr_z3.significand()))
+                        value = ((-1) ** float(expr_z3.sign())) * significand * (2 ** expr_z3_exponent)
+                        str_ret = str(sympy.Float(value, 17))
             else:
                 if DEBUG:
                     print("------- Sub-Sub-Branch other than FPNumRef, probably FPRef")
