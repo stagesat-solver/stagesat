@@ -20,7 +20,7 @@ from src.core.config import SolverConfig
 from src.utils.sort import Sort
 import src.optimization.mcmc as op_mcmc
 import src.utils.verification as verification
-np.set_printoptions(precision=200, suppress=True)
+np.set_printoptions(precision=2000, suppress=True)
 
 def str2bool(v: str) -> bool:
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -43,7 +43,7 @@ def create_typed_input(X, symbolTable):
 def get_parser():
     parser = argparse.ArgumentParser(prog='Xsat')
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 2.0.0')
-    parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=5)
+    parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=50)
     parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=10)
     parser.add_argument('--method', help='Local minimization procedure', default='powell',
                         choices=['powell', 'slsqp', 'cg', 'l-bfgs-b', 'cobyla', 'tnc', 'bfgs', 'nelder-mead',

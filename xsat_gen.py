@@ -160,10 +160,9 @@ def _gen(expr_z3, symbolTable, cache, result):
                         exponent_raw = expr_z3.exponent_as_long()
                         if exponent_raw == 0:
                             expr_z3_exponent = -126 if is_float32 else -1022
-                            significand = float(str(expr_z3.significand()))
                         else:
                             expr_z3_exponent = exponent_raw - offset
-                            significand = 1.0 + float(str(expr_z3.significand()))
+                        significand = float(str(expr_z3.significand()))
                         value = ((-1) ** float(expr_z3.sign())) * significand * (2 ** expr_z3_exponent)
                         str_ret = str(sympy.Float(value, 17))
             else:
