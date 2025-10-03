@@ -63,12 +63,8 @@ static struct PyModuleDef moduledef = {
   NULL,            /* m_free */
 };
 
-#ifndef PYINIT_FUNC_NAME
-#define PYINIT_FUNC_NAME PyInit_foo
-#endif
-
 PyMODINIT_FUNC
-PYINIT_FUNC_NAME(void)
+PyInit_foo(void)
 {
   PyObject* module = PyModule_Create(&moduledef);
   if (module == NULL)
