@@ -43,38 +43,27 @@ build/foo.c: $(IN)  XSAT_IN.txt
 	@mkdir -p build
 	python xsat_gen.py $<  > $@
 
-# compile_square: build/R_square/foo.so
-# build/R_square/foo.so: build/foo.c include/R_square/xsat.h  $(IN)
-# 	@echo [XSAT]Compiling the representing function as $@
-# 	@mkdir -p build/R_square
-# 	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@  $(PYTHONINC) -I include/R_square  $(PYTHONLIB) -fbracket-depth=3000
-
-compile_square: build/R_square/foo_square.so
-build/R_square/foo_square.so: build/foo.c include/R_square/xsat.h $(IN)
-	@echo [XSAT]Compiling the representing function as $@
-	@mkdir -p build/R_square
-	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
-		-DPyInit_foo=PyInit_foo_square \
-		-DMODULE_NAME=\"foo_square\" \
-		-fbracket-depth=3000
-
 compile_verify: build/R_verify/foo.so
 build/R_verify/foo.so: build/foo.c include/R_verify/xsat.h  $(IN)
 	@echo [XSAT]Compiling the representing function as $@
 	@mkdir -p build/R_verify
 	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@  $(PYTHONINC) -I include/R_ulp  $(PYTHONLIB) -fbracket-depth=3000
 
-# compile_ulp: build/R_ulp/foo.so
-# build/R_ulp/foo.so: build/foo.c include/R_ulp/xsat.h  $(IN)
-# 	@echo [XSAT]Compiling the representing function as $@
-# 	@mkdir -p build/R_ulp
-# 	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@  $(PYTHONINC) -I include/R_verify  $(PYTHONLIB) -fbracket-depth=3000
+compile_square: build/R_square/foo_square.so
+build/R_square/foo_square.so: build/foo.c include/R_square/xsat.h $(IN)
+	@echo [XSAT]Compiling the representing function as $@
+	@mkdir -p build/R_square
+	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
+		-DPYINIT_FUNC_NAME=PyInit_foo_square \
+		-DMODULE_NAME=\"foo_square\" \
+		-fbracket-depth=3000
+
 compile_ulp: build/R_ulp/foo_ulp.so
 build/R_ulp/foo_ulp.so: build/foo.c include/R_ulp/xsat.h $(IN)
 	@echo [XSAT]Compiling the representing function as $@
 	@mkdir -p build/R_ulp
 	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_ulp $(PYTHONLIB) \
-		-DPyInit_foo=PyInit_foo_ulp \
+		-DPYINIT_FUNC_NAME=PyInit_foo_ulp \
 		-DMODULE_NAME=\"foo_ulp\" \
 		-fbracket-depth=3000
 
@@ -96,6 +85,7 @@ clean:
 	@rm -vf build/foo.c build/foo.symbolTable
 	@rm -vfr build/R_square build/R_ulp build/R_verify
 	@rm -vf Results/*
+	@rm -vf build/f32_mask.npy
 
 
 .PHONY: copy gen clean compile compile_square test
