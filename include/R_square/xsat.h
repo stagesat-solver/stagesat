@@ -29,7 +29,7 @@ float TR32(double x);
 double MAX(double a, double b);
 
 double ulp(double x, double y) {
-  if (!isfinite(x) || !isfinite(y)) return INFINITY;
+if (!isfinite(x) || !isfinite(y)) return INFINITY;
   return (x-y)*(x-y);
 }
 
@@ -89,6 +89,7 @@ double MAX(double a, double b) {
   return (((a) > (b)) ? (a) : (b));
 }
 double  BAND(double x, double y){return x + y;}
+//double  BAND(double x, double y){return MAX(x, y);}
 double  BOR(double x, double y){return x * y;}
 
 //#endif

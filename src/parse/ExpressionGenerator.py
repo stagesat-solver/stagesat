@@ -1,0 +1,305 @@
+import sympy
+import z3
+import collections
+import warnings
+import src.utils.z3_util as z3_util
+import src.utils.verification as verification
+from src.utils.sort import Sort
+
+DEBUG = False
+
+class ExpressionGenerator:
+    """Generates C code from Z3 expressions."""
+
+    def __init__(self, linearity_analyzer):
+        self.linearity_analyzer = linearity_analyzer
+        self.symbolTable = collections.OrderedDict()
+        self.cache = set()
+        self.result = []
+
+    def reset(self):
+        """Reset the generator state."""
+        self.symbolTable = collections.OrderedDict()
+        self.cache = set()
+        self.result = []
+
+    @staticmethod
+    def get_operand_type(expr, symbolTable, cache):
+        """Determine if an operand is float32 or float64."""
+        if z3_util.is_variable(expr):
+            var_name = verification.rename_var(expr.decl().name())
+            if var_name in symbolTable:
+                return symbolTable[var_name]
+        elif z3_util.is_value(expr):
+            if expr.sort() == z3.Float32():
+                return Sort.Float32
+            elif expr.sort() == z3.Float64():
+                return Sort.Float64
+        elif expr.get_id() in cache:
+            if expr.sort() == z3.Float32():
+                return Sort.Float32
+            elif expr.sort() == z3.Float64():
+                return Sort.Float64
+        return Sort.Float64
+
+    @staticmethod
+    def get_comparison_function(base_func, lhs_type, rhs_type):
+        """Get the appropriate comparison function based on operand types."""
+        if lhs_type == Sort.Float32 and rhs_type == Sort.Float32:
+            return f"{base_func}_f32"
+        else:
+            return base_func
+
+    def generate(self, expr_z3):
+        """Generate C code from Z3 expression tree."""
+        return self._gen_recursive(expr_z3)
+
+    def _gen_recursive(self, expr_z3):
+        """Recursively generate C code for expressions."""
+        if z3_util.is_variable(expr_z3):
+            return self._handle_variable(expr_z3)
+        if z3_util.is_value(expr_z3):
+            return self._handle_value(expr_z3)
+        if expr_z3.get_id() in self.cache:
+            return verification.var_name(expr_z3)
+        self.cache.add(expr_z3.get_id())
+        sort_z3 = expr_z3.decl().kind()
+        # Handle different operation types
+        handlers = {
+            z3.Z3_OP_FPA_LE: self._handle_comparison,
+            z3.Z3_OP_FPA_LT: self._handle_comparison,
+            z3.Z3_OP_FPA_GE: self._handle_comparison,
+            z3.Z3_OP_FPA_GT: self._handle_comparison,
+            z3.Z3_OP_FPA_TO_FP: self._handle_cast,
+            z3.Z3_OP_FPA_SUB: self._handle_arithmetic,
+        }
+        if sort_z3 in handlers:
+            return handlers[sort_z3](expr_z3)
+        if z3_util.is_eq(expr_z3):
+            return self._handle_equality(expr_z3)
+        if z3_util.is_fpMul(expr_z3):
+            return self._handle_arithmetic(expr_z3)
+        if z3_util.is_fpDiv(expr_z3):
+            return self._handle_arithmetic(expr_z3)
+        if z3_util.is_fpAdd(expr_z3):
+            return self._handle_arithmetic(expr_z3)
+        if z3.is_and(expr_z3):
+            return self._handle_and(expr_z3)
+        if z3.is_not(expr_z3):
+            return self._handle_not(expr_z3)
+        if z3_util.is_fpNeg(expr_z3):
+            return self._handle_negation(expr_z3)
+        raise NotImplementedError(
+            f"Not implemented case for expr_z3 = {expr_z3}, kind({expr_z3.decl().kind()})")
+
+    def _handle_variable(self, expr_z3):
+        """Handle variable expressions."""
+        if DEBUG:
+            print("-- Branch _is_variable with ", expr_z3)
+        symVar = verification.rename_var(expr_z3.decl().name())
+        if z3.is_int(expr_z3):
+            symType = Sort.Int
+        elif z3.is_fp(expr_z3):
+            if expr_z3.sort() == z3.Float64():
+                symType = Sort.Float64
+            elif expr_z3.sort() == z3.Float32():
+                symType = Sort.Float32
+            else:
+                raise NotImplementedError("Unexpected sort.", expr_z3.sort())
+        elif z3.is_real(expr_z3):
+            symType = Sort.Float
+            warnings.warn(f"****WARNING****: Real variable '{symVar}' treated as floating point")
+        else:
+            raise NotImplementedError("Unexpected type")
+        if symVar in self.symbolTable:
+            assert symType == self.symbolTable[symVar]
+        else:
+            self.symbolTable[symVar] = symType
+        return symVar
+
+    def _handle_value(self, expr_z3):
+        """Handle constant value expressions."""
+        if DEBUG:
+            print("-- Branch _is_value")
+        if z3.is_fp(expr_z3) or z3.is_real(expr_z3):
+            if isinstance(expr_z3, z3.FPNumRef):
+                if expr_z3.isNaN():
+                    str_ret = "NAN"
+                elif expr_z3.isInf() and expr_z3.decl().kind() == z3.Z3_OP_FPA_PLUS_INF:
+                    str_ret = "INFINITY"
+                elif expr_z3.isInf() and expr_z3.decl().kind() == z3.Z3_OP_FPA_MINUS_INF:
+                    str_ret = "- INFINITY"
+                else:
+                    try:
+                        str_ret = str(sympy.Float(str(expr_z3), 17))
+                    except ValueError:
+                        is_float32 = expr_z3.sort() == z3.Float32()
+                        offset = 127 if is_float32 else 1023
+                        exponent_raw = expr_z3.exponent_as_long()
+                        if exponent_raw == 0:
+                            expr_z3_exponent = -126 if is_float32 else -1022
+                        else:
+                            expr_z3_exponent = exponent_raw - offset
+                        significand = float(str(expr_z3.significand()))
+                        value = ((-1) ** float(expr_z3.sign())) * significand * (2 ** expr_z3_exponent)
+                        str_ret = str(sympy.Float(value, 17))
+            else:
+                str_ret = str(sympy.Float(str(expr_z3), 17))
+        elif z3.is_int(expr_z3):
+            str_ret = str(sympy.Integer(str(expr_z3)))
+        elif z3_util.is_true(expr_z3):
+            str_ret = "0"
+        elif z3_util.is_false(expr_z3):
+            str_ret = "1"
+        else:
+            raise NotImplementedError("[XSat] type not considered")
+        if expr_z3.sort() == z3.Float32():
+            str_ret = str_ret + "f"
+        return str_ret
+
+    def _handle_comparison(self, expr_z3):
+        """Handle comparison operations (LE, LT, GE, GT)."""
+        sort_z3 = expr_z3.decl().kind()
+        op_map = {
+            z3.Z3_OP_FPA_LE: "DLE",
+            z3.Z3_OP_FPA_LT: "DLT",
+            z3.Z3_OP_FPA_GE: "DGE",
+            z3.Z3_OP_FPA_GT: "DGT"
+        }
+        base_func = op_map[sort_z3]
+        constraint_name = base_func[1:]  # Remove 'D' prefix
+        lhs = self._gen_recursive(expr_z3.arg(0))
+        rhs = self._gen_recursive(expr_z3.arg(1))
+        lhs_type = self.get_operand_type(expr_z3.arg(0), self.symbolTable, self.cache)
+        rhs_type = self.get_operand_type(expr_z3.arg(1), self.symbolTable, self.cache)
+        lhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(0), self.symbolTable, self.cache)
+        rhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(1), self.symbolTable, self.cache)
+        is_linear = lhs_linear and rhs_linear
+        expr_id = expr_z3.get_id()
+        self.linearity_analyzer.linearity_info[expr_id] = (
+            is_linear, f"CONSTRAINT_{constraint_name}(lhs={lhs_linear},rhs={rhs_linear})")
+        func_name = self.get_comparison_function(base_func, lhs_type, rhs_type)
+        comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
+        toAppend = f"double {verification.var_name(expr_z3)} = {func_name}({lhs},{rhs});{comment}"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)
+
+    def _handle_equality(self, expr_z3):
+        """Handle equality operations."""
+        lhs = self._gen_recursive(expr_z3.arg(0))
+        rhs = self._gen_recursive(expr_z3.arg(1))
+        lhs_type = self.get_operand_type(expr_z3.arg(0), self.symbolTable, self.cache)
+        rhs_type = self.get_operand_type(expr_z3.arg(1), self.symbolTable, self.cache)
+        lhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(0), self.symbolTable, self.cache)
+        rhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(1), self.symbolTable, self.cache)
+        is_linear = lhs_linear and rhs_linear
+        expr_id = expr_z3.get_id()
+        self.linearity_analyzer.linearity_info[expr_id] = (
+            is_linear, f"CONSTRAINT_EQ(lhs={lhs_linear},rhs={rhs_linear})")
+        func_name = self.get_comparison_function("DEQ", lhs_type, rhs_type)
+        comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
+        toAppend = f"double {verification.var_name(expr_z3)} = {func_name}({lhs},{rhs});{comment}"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)
+
+    def _handle_arithmetic(self, expr_z3):
+        """Handle arithmetic operations (add, sub, mul, div)."""
+        sort_z3 = expr_z3.decl().kind()
+        expr_type = 'float' if expr_z3.sort() == z3.FPSort(8, 24) else 'double'
+        if not z3_util.is_RNE(expr_z3.arg(0)):
+            warnings.warn(f"WARNING!!! arg(0) is not RNE but treated as RNE. arg(0) = {expr_z3.arg(0)}")
+        assert expr_z3.num_args() == 3
+        lhs = self._gen_recursive(expr_z3.arg(1))
+        rhs = self._gen_recursive(expr_z3.arg(2))
+        op_map = {
+            z3.Z3_OP_FPA_ADD: '+',
+            z3.Z3_OP_FPA_SUB: '-',
+            z3.Z3_OP_FPA_MUL: '*',
+            z3.Z3_OP_FPA_DIV: '/'
+        }
+        # Handle fpMul, fpDiv, fpAdd specifically
+        if z3_util.is_fpMul(expr_z3):
+            op = '*'
+        elif z3_util.is_fpDiv(expr_z3):
+            op = '/'
+        elif z3_util.is_fpAdd(expr_z3):
+            op = '+'
+        elif sort_z3 == z3.Z3_OP_FPA_SUB:
+            op = '-'
+        else:
+            raise NotImplementedError("bugs in _handle_arithmetic")
+        if expr_type == 'float':
+            toAppend = f"float {verification.var_name(expr_z3)} = (float)({lhs}) {op} (float)({rhs});"
+        else:
+            toAppend = f"double {verification.var_name(expr_z3)} = {lhs} {op} {rhs};"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)
+
+    def _handle_cast(self, expr_z3):
+        """Handle type casting operations."""
+        assert expr_z3.num_args() == 2
+        if not z3_util.is_RNE(expr_z3.arg(0)):
+            warnings.warn(f"WARNING!!! First argument of fpFP is not RNE: {expr_z3.arg(0)}")
+        x = self._gen_recursive(expr_z3.arg(1))
+        if expr_z3.sort() == z3.FPSort(8, 24):
+            toAppend = f"float {verification.var_name(expr_z3)} = (float)({x});"
+        else:
+            toAppend = f"double {verification.var_name(expr_z3)} = (double)({x});"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)
+
+    def _handle_and(self, expr_z3):
+        """Handle AND operations."""
+        if DEBUG:
+            print("-- Branch _is_and")
+        toAppendExpr = self._gen_recursive(expr_z3.arg(0))
+        for i in range(1, expr_z3.num_args()):
+            toAppendExpr = f'BAND( {toAppendExpr},{self._gen_recursive(expr_z3.arg(i))} )'
+        toAppend = f"double {verification.var_name(expr_z3)} = {toAppendExpr};"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)
+
+    def _handle_not(self, expr_z3):
+        """Handle NOT operations."""
+        assert expr_z3.num_args() == 1
+        if expr_z3.arg(0).num_args() != 2:
+            warnings.warn(f"WARNING!!! arg(0) num_args != 2: {expr_z3.arg(0)}")
+        op1 = self._gen_recursive(expr_z3.arg(0).arg(0))
+        op2 = self._gen_recursive(expr_z3.arg(0).arg(1))
+        lhs_type = self.get_operand_type(expr_z3.arg(0).arg(0), self.symbolTable, self.cache)
+        rhs_type = self.get_operand_type(expr_z3.arg(0).arg(1), self.symbolTable, self.cache)
+        lhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(0).arg(0), self.symbolTable, self.cache)
+        rhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(0).arg(1), self.symbolTable, self.cache)
+        is_linear = lhs_linear and rhs_linear
+        expr_id = expr_z3.get_id()
+        # Determine which negated comparison this is
+        comparison_map = {
+            'is_ge': ('DLT', 'CONSTRAINT_NOT_GE'),
+            'is_gt': ('DLE', 'CONSTRAINT_NOT_GT'),
+            'is_le': ('DGT', 'CONSTRAINT_NOT_LE'),
+            'is_lt': ('DGE', 'CONSTRAINT_NOT_LT'),
+            'is_eq': ('DNE', 'CONSTRAINT_NOT_EQ'),
+            'is_distinct': ('DEQ', 'CONSTRAINT_NOT_DISTINCT')
+        }
+        for check_name, (func_base, constraint_type) in comparison_map.items():
+            check_func = getattr(z3_util, check_name)
+            if check_func(expr_z3.arg(0)):
+                func = self.get_comparison_function(func_base, lhs_type, rhs_type)
+                self.linearity_analyzer.linearity_info[expr_id] = (
+                    is_linear, f"{constraint_type}(lhs={lhs_linear},rhs={rhs_linear})")
+                break
+        else:
+            raise NotImplementedError("Not implemented case in NOT handler")
+        comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
+        toAppend = f"double {verification.var_name(expr_z3)} = {func}({op1},{op2});{comment}"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)
+
+    def _handle_negation(self, expr_z3):
+        """Handle negation operations."""
+        assert expr_z3.num_args() == 1
+        op1 = self._gen_recursive(expr_z3.arg(0))
+        expr_type = 'float' if expr_z3.sort() == z3.FPSort(8, 24) else 'double'
+        toAppend = f"{expr_type} {verification.var_name(expr_z3)} = - {op1} ;"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)

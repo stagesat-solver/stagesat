@@ -1,42 +1,46 @@
 #!/usr/bin/env python3
 
-import os,sys
+import os, sys
 import subprocess
-import csv
-import time
-import gc
-import collections
 import argparse
 
 OKGREEN = '\033[92m'
 WARNING = '\033[93m'
 ENDC = '\033[0m'
 
-def okay( msg):
+
+def okay(msg):
     return OKGREEN + msg + ENDC
 
-def warn( msg):
-    return  WARNING + msg + ENDC
+
+def warn(msg):
+    return WARNING + msg + ENDC
+
 
 parser = argparse.ArgumentParser(prog='test')
-parser.add_argument('--quick', help='specify how fast you want the test be done', type=int, required=False, default = 1)
+parser.add_argument('--quick', help='specify how fast you want the test be done', type=int, required=False, default=1)
 parser.add_argument('--small', action='store_true', help='use small benchmarks')
 parser.add_argument('--middle', action='store_true', help='use middle benchmarks')
 parser.add_argument('--large', action='store_true', help='use large benchmarks')
 args = parser.parse_args()
 
 # middle
-testFiles_middle=["div2.c.30","mult1.c.30","div3.c.30","div.c.30","mult2.c.30",\
-           "test_v7_r7_vr10_c1_s24535","test_v5_r10_vr5_c1_s13195", "div2.c.40","mult1.c.40","test_v7_r7_vr1_c1_s24449",\
-           "div3.c.40","div.c.40","mult2.c.40","test_v7_r7_vr5_c1_s3582","test_v7_r7_vr1_c1_s22845",\
-           "test_v7_r7_vr5_c1_s19694","test_v7_r7_vr5_c1_s14675","test_v7_r7_vr10_c1_s32506","test_v7_r7_vr10_c1_s10625","test_v7_r7_vr1_c1_s4574",\
-           "test_v5_r10_vr5_c1_s8690","test_v5_r10_vr1_c1_s32538","test_v5_r10_vr5_c1_s13679","test_v5_r10_vr10_c1_s15708","test_v5_r10_vr10_c1_s7608",\
-           "test_v5_r10_vr1_c1_s19145","test_v5_r10_vr1_c1_s13516","test_v5_r10_vr10_c1_s21502","sin2.c.10","div2.c.50",\
-           "mult1.c.50","div3.c.50","mult2.c.50","div.c.50"]
-expected_results_middle = ["sat", "sat","sat","sat","sat","sat","sat","sat","sat","unsat","sat","sat","sat","sat","sat","sat","sat","sat","sat","sat","unsat","unsat","sat","unsat","unsat","sat","sat","unsat","sat","sat","sat","sat","sat","sat"]
+testFiles_middle = ["div2.c.30", "mult1.c.30", "div3.c.30", "div.c.30", "mult2.c.30",
+                    "test_v7_r7_vr10_c1_s24535", "test_v5_r10_vr5_c1_s13195", "div2.c.40", "mult1.c.40",
+                    "test_v7_r7_vr1_c1_s24449",
+                    "div3.c.40", "div.c.40", "mult2.c.40", "test_v7_r7_vr5_c1_s3582", "test_v7_r7_vr1_c1_s22845",
+                    "test_v7_r7_vr5_c1_s19694", "test_v7_r7_vr5_c1_s14675", "test_v7_r7_vr10_c1_s32506",
+                    "test_v7_r7_vr10_c1_s10625", "test_v7_r7_vr1_c1_s4574",
+                    "test_v5_r10_vr5_c1_s8690", "test_v5_r10_vr1_c1_s32538", "test_v5_r10_vr5_c1_s13679",
+                    "test_v5_r10_vr10_c1_s15708", "test_v5_r10_vr10_c1_s7608",
+                    "test_v5_r10_vr1_c1_s19145", "test_v5_r10_vr1_c1_s13516", "test_v5_r10_vr10_c1_s21502", "sin2.c.10",
+                    "div2.c.50",
+                    "mult1.c.50", "div3.c.50", "mult2.c.50", "div.c.50"]
+expected_results_middle = ["sat", "sat", "sat", "sat", "sat", "sat", "sat", "sat", "sat", "unsat", "sat", "sat", "sat",
+                           "sat", "sat", "sat", "sat", "sat", "sat", "sat", "unsat", "unsat", "sat", "unsat", "unsat",
+                           "sat", "sat", "unsat", "sat", "sat", "sat", "sat", "sat", "sat"]
 
 # small
-
 testFiles_small = [
     "test_v5_r15_vr10_c1_s11127",
     "square",
@@ -172,246 +176,44 @@ testFiles_small = [
 ]
 
 expected_results_small = [
-    "sat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsupported",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
+    "sat", "unsat", "sat", "sat", "sat", "unsat", "sat", "sat", "sat", "sat",
+    "sat", "sat", "sat", "sat", "sat", "sat", "sat", "sat", "sat", "unsat",
+    "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "sat", "sat", "unsat", "unsat",
+    "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "sat", "sat", "sat", "sat",
+    "sat", "sat", "unsat", "unsat", "unsat", "unsat", "sat", "sat", "sat", "unsat",
+    "unsat", "sat", "sat", "sat", "sat", "unsat", "unsat", "unsat", "unsat", "unsat",
+    "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat",
+    "unsat", "unsupported", "unsat", "unsat", "unsat", "unsat", "sat", "sat", "sat", "sat",
+    "sat", "unsat", "unsat", "unsat", "unsat", "unsat", "sat", "unsat", "sat", "sat",
+    "sat", "unsat", "unsat", "unsat", "unsat", "sat", "sat", "sat", "unsat", "sat",
+    "sat", "unsat", "unsat", "unsat", "unsat", "sat", "sat", "sat", "sat", "sat",
+    "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "sat", "unsat", "unsat",
+    "sat", "sat", "sat", "sat", "sat", "sat", "sat", "sat", "sat", "sat",
     "unsat"
 ]
 
-
 # large
-
 testFiles_large = [
-    "sqrt.c.10",
-    "test_v5_r15_vr5_c1_s8246",
-    "test_v5_r15_vr1_c1_s26845",
-    "test_v5_r15_vr10_c1_s25268",
-    "test_v5_r15_vr5_c1_s26657",
-    "test_v5_r15_vr5_c1_s23844",
-    "test_v5_r15_vr1_c1_s8236",
-    "test_v5_r15_vr1_c1_s32559",
-    "test_v5_r15_vr10_c1_s14516",
-    "qurt.c.5",
-    "test_v7_r12_vr5_c1_s29826",
-    "test_v7_r12_vr10_c1_s15994",
-    "test_v7_r12_vr10_c1_s30410",
-    "test_v7_r12_vr5_c1_s14336",
-    "test_v7_r12_vr5_c1_s8938",
-    "test_v7_r12_vr1_c1_s10576",
-    "test_v7_r12_vr1_c1_s22787",
-    "test_v7_r12_vr10_c1_s18160",
-    "test_v7_r12_vr1_c1_s703",
-    "sin2.c.15",
-    "gaussian.c.25",
-    "sqrt.c.15",
-    "test_v7_r17_vr5_c1_s2807",
-    "test_v7_r17_vr1_c1_s30331",
-    "test_v7_r17_vr5_c1_s25451",
-    "sin2.c.20",
-    "test_v7_r17_vr10_c1_s8773",
-    "test_v7_r17_vr5_c1_s4772",
-    "test_v7_r17_vr1_c1_s24331",
-    "test_v7_r17_vr1_c1_s23882",
-    "test_v7_r17_vr10_c1_s3680",
-    "test_v7_r17_vr10_c1_s18654",
-    "sin.c.25",
-    "sin2.c.25",
-    "sqrt.c.25",
-    "sqrt.c.20",
-    "qurt.c.10",
-    "qurt.c.15",
-    "gaussian.c.75",
-    "qurt.c.25",
-    "qurt.c.20",
-    "sin2.c.75",
-    "sin.c.75",
-    "gaussian.c.125",
-    "sin2.c.125",
-    "sin.c.125",
-    "gaussian.c.175",
-    "sin2.c.175",
-    "sin.c.175"
+    "sqrt.c.10", "test_v5_r15_vr5_c1_s8246", "test_v5_r15_vr1_c1_s26845", "test_v5_r15_vr10_c1_s25268",
+    "test_v5_r15_vr5_c1_s26657", "test_v5_r15_vr5_c1_s23844", "test_v5_r15_vr1_c1_s8236", "test_v5_r15_vr1_c1_s32559",
+    "test_v5_r15_vr10_c1_s14516", "qurt.c.5", "test_v7_r12_vr5_c1_s29826", "test_v7_r12_vr10_c1_s15994",
+    "test_v7_r12_vr10_c1_s30410", "test_v7_r12_vr5_c1_s14336", "test_v7_r12_vr5_c1_s8938", "test_v7_r12_vr1_c1_s10576",
+    "test_v7_r12_vr1_c1_s22787", "test_v7_r12_vr10_c1_s18160", "test_v7_r12_vr1_c1_s703", "sin2.c.15",
+    "gaussian.c.25", "sqrt.c.15", "test_v7_r17_vr5_c1_s2807", "test_v7_r17_vr1_c1_s30331", "test_v7_r17_vr5_c1_s25451",
+    "sin2.c.20", "test_v7_r17_vr10_c1_s8773", "test_v7_r17_vr5_c1_s4772", "test_v7_r17_vr1_c1_s24331",
+    "test_v7_r17_vr1_c1_s23882", "test_v7_r17_vr10_c1_s3680", "test_v7_r17_vr10_c1_s18654", "sin.c.25",
+    "sin2.c.25", "sqrt.c.25", "sqrt.c.20", "qurt.c.10", "qurt.c.15", "gaussian.c.75",
+    "qurt.c.25", "qurt.c.20", "sin2.c.75", "sin.c.75", "gaussian.c.125", "sin2.c.125",
+    "sin.c.125", "gaussian.c.175", "sin2.c.175", "sin.c.175"
 ]
 
 expected_results_large = [
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "sat",
-    "sat",
-    "unsat",
-    "unsat",
-    "sat",
-    "unsat",
-    "sat",
-    "sat",
-    "timeout",
-    "unsat",
-    "unsat",
-    "unsat",
-    "unsat",
-    "timeout",
-    "unsat",
-    "unsat",
-    "timeout",
-    "timeout",
-    "timeout",
-    "timeout",
-    "timeout",
-    "timeout",
-    "timeout",
-    "timeout"
+    "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat", "unsat",
+    "sat", "sat", "sat", "sat", "sat", "unsat", "unsat", "unsat", "unsat", "sat",
+    "sat", "unsat", "unsat", "unsat", "unsat", "sat", "sat", "unsat", "unsat", "sat",
+    "unsat", "sat", "sat", "timeout", "unsat", "unsat", "unsat", "unsat", "timeout", "unsat",
+    "unsat", "timeout", "timeout", "timeout", "timeout", "timeout", "timeout", "timeout", "timeout"
 ]
-
 
 if args.small:
     testFiles = testFiles_small
@@ -426,17 +228,47 @@ elif args.large:
     expected_results = expected_results_large
     benchmark_dir = "large"
 
+with open(os.devnull, 'wb') as devnull:
+    for i, (f, expected) in enumerate(zip(testFiles, expected_results)):
+        if (i + 1) % args.quick != 0:
+            continue
 
-for i, (f, expected) in enumerate (zip (testFiles, expected_results)):
-    if (i + 1) % args.quick != 0: continue
+        fileName = f"Benchmarks/{benchmark_dir}/" + f + ".smt2"
 
-    fileName = f"Benchmarks/{benchmark_dir}/" + f + ".smt2"
+        print("(%s)" % (i + 1), "Working on", fileName)
 
-    print("(%s)" %(i + 1), "Working on", fileName)
-    COMMAND0 = 'make -j IN=%s' % fileName
-    print("   Compiling ...")
-    subprocess.check_call(COMMAND0.split(), stdout=open(os.devnull, 'wb'))
-    print("   Solving ...")
-    COMMAND='python3 xsat.py --bench'
-    satisfiability = subprocess.check_output(COMMAND.split()).decode('utf-8').rstrip()
-    print("   ==> "+ satisfiability, okay("[Expected]") if satisfiability == expected else warn("[Unexpected]"))
+        # Clean
+        print("   Cleaning ...")
+        subprocess.run(['make', 'clean'], stdout=devnull, stderr=devnull)
+
+        # Use shell=True and set IN as environment variable to ensure proper propagation
+        env = os.environ.copy()
+        env['IN'] = fileName
+
+        # Compile everything at once - let Makefile handle the order
+        print("   Compiling ...")
+        result = subprocess.run('make compile', shell=True, env=env,
+                                stdout=devnull, stderr=subprocess.STDOUT)
+
+        if result.returncode != 0:
+            print(f"   Compilation failed with return code {result.returncode}")
+            print("   ==> error", warn("[Unexpected]"))
+            continue
+
+        # Run the solver
+        print("   Solving ...")
+        try:
+            result = subprocess.run(['python3', 'xsat.py', '--bench'],
+                                    capture_output=True, text=True, timeout=300)
+            satisfiability = result.stdout.strip()
+
+            if not satisfiability:
+                satisfiability = "error"
+
+        except subprocess.TimeoutExpired:
+            satisfiability = "timeout"
+        except Exception as e:
+            print(f"   Error running solver: {e}")
+            satisfiability = "error"
+
+        print("   ==> " + satisfiability, okay("[Expected]") if satisfiability == expected else warn("[Unexpected]"))

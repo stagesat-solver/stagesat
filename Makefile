@@ -43,12 +43,6 @@ build/foo.c: $(IN)  XSAT_IN.txt
 	@mkdir -p build
 	python xsat_gen.py $<  > $@
 
-# compile_square: build/R_square/foo.so
-# build/R_square/foo.so: build/foo.c include/R_square/xsat.h  $(IN)
-# 	@echo [XSAT]Compiling the representing function as $@
-# 	@mkdir -p build/R_square
-# 	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@  $(PYTHONINC) -I include/R_square  $(PYTHONLIB) -fbracket-depth=3000
-
 compile_square: build/R_square/foo_square.so
 build/R_square/foo_square.so: build/foo.c include/R_square/xsat.h $(IN)
 	@echo [XSAT]Compiling the representing function as $@
@@ -64,11 +58,6 @@ build/R_verify/foo.so: build/foo.c include/R_verify/xsat.h  $(IN)
 	@mkdir -p build/R_verify
 	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@  $(PYTHONINC) -I include/R_ulp  $(PYTHONLIB) -fbracket-depth=3000
 
-# compile_ulp: build/R_ulp/foo.so
-# build/R_ulp/foo.so: build/foo.c include/R_ulp/xsat.h  $(IN)
-# 	@echo [XSAT]Compiling the representing function as $@
-# 	@mkdir -p build/R_ulp
-# 	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@  $(PYTHONINC) -I include/R_verify  $(PYTHONLIB) -fbracket-depth=3000
 compile_ulp: build/R_ulp/foo_ulp.so
 build/R_ulp/foo_ulp.so: build/foo.c include/R_ulp/xsat.h $(IN)
 	@echo [XSAT]Compiling the representing function as $@
