@@ -18,6 +18,7 @@ class ExpressionGenerator:
         self.linear_eq_constraints = []  # List of (id, lhs_expr, rhs_expr)
         self.other_constraints = []  # List of (id, c_var_name)
         self.use_hybrid = True  # Flag to enable/disable hybrid approach
+        self.inside_or = False
 
     def reset(self):
         """Reset the generator state."""
@@ -26,6 +27,7 @@ class ExpressionGenerator:
         self.result = []
         self.linear_eq_constraints = []
         self.other_constraints = []
+        self.inside_or = False
 
     @staticmethod
     def get_operand_type(expr, symbolTable, cache):
@@ -189,7 +191,8 @@ class ExpressionGenerator:
         toAppend = f"double {verification.var_name(expr_z3)} = {func_name}({lhs},{rhs});{comment}"
         self.result.append(toAppend)
         # Track as other constraint (not linear equality)
-        self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
+        if not self.inside_or:
+            self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
         return verification.var_name(expr_z3)
 
     def _handle_equality(self, expr_z3):
@@ -206,13 +209,15 @@ class ExpressionGenerator:
         expr_id = expr_z3.get_id()
         self.linearity_analyzer.linearity_info[expr_id] = (
             is_linear, f"CONSTRAINT_EQ(lhs={lhs_linear},rhs={rhs_linear})")
-        # Track linear equalities separately if hybrid mode is enabled
-        if self.use_hybrid and is_linear:
+        if self.use_hybrid and is_linear and not self.inside_or:
             self.linear_eq_constraints.append((expr_id, lhs_expr, rhs_expr))
             comment = " // LINEAR EQ - for projection objective"
         else:
-            self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
-            comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
+            if self.inside_or:
+                comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'} EQ - inside OR (treated as other constraint)"
+            else:
+                self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
+                comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
         func_name = self.get_comparison_function("DEQ", lhs_type, rhs_type)
         toAppend = f"double {verification.var_name(expr_z3)} = {func_name}({lhs},{rhs});{comment}"
         self.result.append(toAppend)
@@ -276,8 +281,20 @@ class ExpressionGenerator:
         return verification.var_name(expr_z3)
 
     def _handle_or(self, expr_z3):
-        # TODO implement BOR
-        return
+        """Handle OR operations."""
+        if DEBUG:
+            print("-- Branch _is_or")
+        old_inside_or = self.inside_or
+        self.inside_or = True
+        toAppendExpr = self._gen_recursive(expr_z3.arg(0))
+        for i in range(1, expr_z3.num_args()):
+            toAppendExpr = f'BOR( {toAppendExpr},{self._gen_recursive(expr_z3.arg(i))} )'
+        self.inside_or = old_inside_or
+        # add total BOR results as one other_constraints
+        self.other_constraints.append((expr_z3.get_id(), verification.var_name(expr_z3)))
+        toAppend = f"double {verification.var_name(expr_z3)} = {toAppendExpr};"
+        self.result.append(toAppend)
+        return verification.var_name(expr_z3)
 
     def _handle_not(self, expr_z3):
         """Handle NOT operations."""
@@ -310,7 +327,8 @@ class ExpressionGenerator:
                 break
         else:
             raise NotImplementedError("Not implemented case in NOT handler")
-        self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
+        if not self.inside_or:
+            self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
         comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
         toAppend = f"double {verification.var_name(expr_z3)} = {func}({op1},{op2});{comment}"
         self.result.append(toAppend)

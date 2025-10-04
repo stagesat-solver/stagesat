@@ -52,8 +52,6 @@ class CodeGenerator:
                 if other_constraint_vars:
                     # Combine both objectives
                     other_obj = " + ".join(other_constraint_vars) if other_constraint_vars else "0.0"
-                    # TODO check the last variable, based on BAND and BOR generate the code, need to change
-                    #  ExpressionGenerator!!!!!!!!!!!!!!!
                     objective_computation = f"""
 // Compute projection objective for linear equalities
 double obj_linear_eq = compute_projection_objective({", ".join(symbolTable.keys())});
@@ -85,7 +83,7 @@ double final_objective = compute_projection_objective({", ".join(symbolTable.key
                 raise NotImplementedError("Unknown types in SMT")
         x_body = '\n  '.join(self.expr_generator.result)
         x_dim = len(symbolTable)
-        x_expr = "final_objective"
+        x_expr = "final_objective" if linear_eq_constraints else verification.var_name(expr_z3)
         code = self.template.get_template() % {
             "matrix_functions": matrix_code,
             "var_declarations": "\n  ".join(var_declarations),
@@ -119,14 +117,14 @@ static double compute_projection_objective({", ".join([f"double {var}" for var i
     static const double b[{m}] = {b_init};
 
     // Input vector z
-    double z[{n}] = {{{", ".join([var for var in symbolTable.keys()])}}};
+    double z_input[{n}] = {{{", ".join([var for var in symbolTable.keys()])}}};
 
     // Compute Az - b
     double residual[{m}];
     for (int i = 0; i < {m}; i++) {{
         residual[i] = -b[i];
         for (int j = 0; j < {n}; j++) {{
-            residual[i] += A[i][j] * z[j];
+            residual[i] += A[i][j] * z_input[j];
         }}
     }}
 
