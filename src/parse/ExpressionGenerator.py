@@ -9,19 +9,23 @@ from src.utils.sort import Sort
 DEBUG = False
 
 class ExpressionGenerator:
-    """Generates C code from Z3 expressions."""
-
     def __init__(self, linearity_analyzer):
         self.linearity_analyzer = linearity_analyzer
         self.symbolTable = collections.OrderedDict()
         self.cache = set()
         self.result = []
+        # New attributes for hybrid approach
+        self.linear_eq_constraints = []  # List of (id, lhs_expr, rhs_expr)
+        self.other_constraints = []  # List of (id, c_var_name)
+        self.use_hybrid = True  # Flag to enable/disable hybrid approach
 
     def reset(self):
         """Reset the generator state."""
         self.symbolTable = collections.OrderedDict()
         self.cache = set()
         self.result = []
+        self.linear_eq_constraints = []
+        self.other_constraints = []
 
     @staticmethod
     def get_operand_type(expr, symbolTable, cache):
@@ -89,6 +93,8 @@ class ExpressionGenerator:
             return self._handle_not(expr_z3)
         if z3_util.is_fpNeg(expr_z3):
             return self._handle_negation(expr_z3)
+        if z3.is_or(expr_z3):
+            return self._handle_or(expr_z3)
         raise NotImplementedError(
             f"Not implemented case for expr_z3 = {expr_z3}, kind({expr_z3.decl().kind()})")
 
@@ -182,22 +188,32 @@ class ExpressionGenerator:
         comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
         toAppend = f"double {verification.var_name(expr_z3)} = {func_name}({lhs},{rhs});{comment}"
         self.result.append(toAppend)
+        # Track as other constraint (not linear equality)
+        self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
         return verification.var_name(expr_z3)
 
     def _handle_equality(self, expr_z3):
         """Handle equality operations."""
-        lhs = self._gen_recursive(expr_z3.arg(0))
-        rhs = self._gen_recursive(expr_z3.arg(1))
-        lhs_type = self.get_operand_type(expr_z3.arg(0), self.symbolTable, self.cache)
-        rhs_type = self.get_operand_type(expr_z3.arg(1), self.symbolTable, self.cache)
-        lhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(0), self.symbolTable, self.cache)
-        rhs_linear = self.linearity_analyzer.is_linear(expr_z3.arg(1), self.symbolTable, self.cache)
+        lhs_expr = expr_z3.arg(0)
+        rhs_expr = expr_z3.arg(1)
+        lhs = self._gen_recursive(lhs_expr)
+        rhs = self._gen_recursive(rhs_expr)
+        lhs_type = self.get_operand_type(lhs_expr, self.symbolTable, self.cache)
+        rhs_type = self.get_operand_type(rhs_expr, self.symbolTable, self.cache)
+        lhs_linear = self.linearity_analyzer.is_linear(lhs_expr, self.symbolTable, self.cache)
+        rhs_linear = self.linearity_analyzer.is_linear(rhs_expr, self.symbolTable, self.cache)
         is_linear = lhs_linear and rhs_linear
         expr_id = expr_z3.get_id()
         self.linearity_analyzer.linearity_info[expr_id] = (
             is_linear, f"CONSTRAINT_EQ(lhs={lhs_linear},rhs={rhs_linear})")
+        # Track linear equalities separately if hybrid mode is enabled
+        if self.use_hybrid and is_linear:
+            self.linear_eq_constraints.append((expr_id, lhs_expr, rhs_expr))
+            comment = " // LINEAR EQ - for projection objective"
+        else:
+            self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
+            comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
         func_name = self.get_comparison_function("DEQ", lhs_type, rhs_type)
-        comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
         toAppend = f"double {verification.var_name(expr_z3)} = {func_name}({lhs},{rhs});{comment}"
         self.result.append(toAppend)
         return verification.var_name(expr_z3)
@@ -259,6 +275,10 @@ class ExpressionGenerator:
         self.result.append(toAppend)
         return verification.var_name(expr_z3)
 
+    def _handle_or(self, expr_z3):
+        # TODO implement BOR
+        return
+
     def _handle_not(self, expr_z3):
         """Handle NOT operations."""
         assert expr_z3.num_args() == 1
@@ -290,6 +310,7 @@ class ExpressionGenerator:
                 break
         else:
             raise NotImplementedError("Not implemented case in NOT handler")
+        self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
         comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
         toAppend = f"double {verification.var_name(expr_z3)} = {func}({op1},{op2});{comment}"
         self.result.append(toAppend)

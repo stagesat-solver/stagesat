@@ -1,20 +1,11 @@
-import sympy
 import z3
-import numpy as np
-import scipy.optimize as op
 import argparse
 import sys, os
-import time
-import collections
-import subprocess
-import multiprocessing as mp
 import warnings
-import struct
 import pickle
-import src.utils.z3_util as z3_util
 import src.utils.verification as verification
 from src.utils.sort import Sort
-from src.parse import LinearityAnalyzer, ExpressionGenerator, CodeTemplate
+from src.parse import LinearConstraintExtractor, ExpressionGenerator, CodeTemplate, LinearityAnalyzer
 
 DEBUG = False
 
@@ -32,17 +23,56 @@ class CodeGenerator:
         self.linearity_analyzer.reset()
         self.expr_generator.reset()
         # Generate code
-        self.expr_generator.generate(expr_z3)
-        # Print report
-        # if len(self.expr_generator.symbolTable) > 0:
-        #     self.linearity_analyzer.print_report()
+        main_expr = self.expr_generator.generate(expr_z3)
+        symbolTable = self.expr_generator.symbolTable
         if len(self.expr_generator.symbolTable) == 0:
             return self.expr_generator.symbolTable, 'int main(){return 0;}'
-        # Build variable declarations
+        extractor = LinearConstraintExtractor(symbolTable)
+        linear_eq_constraints = []
+        other_constraint_vars = []
+        for constraint_id, lhs_expr, rhs_expr in self.expr_generator.linear_eq_constraints:
+            # Check if both sides are linear
+            lhs_linear = self.linearity_analyzer.is_linear(lhs_expr, symbolTable, self.expr_generator.cache)
+            rhs_linear = self.linearity_analyzer.is_linear(rhs_expr, symbolTable, self.expr_generator.cache)
+            if lhs_linear and rhs_linear:
+                linear_eq_constraints.append((lhs_expr, rhs_expr))
+            else:
+                other_constraint_vars.append(verification.var_name_from_id(constraint_id))
+        for constraint_id, var_name in self.expr_generator.other_constraints:
+            other_constraint_vars.append(var_name)
+        matrix_code = ""
+        objective_computation = ""
+        return_expr = main_expr
+        if linear_eq_constraints:
+            extractor.linear_eq_constraints = linear_eq_constraints
+            A, b = extractor.build_matrices()
+            if A is not None:
+                matrix_code = self._generate_matrix_code(A, b, symbolTable)
+                # Generate combined objective
+                if other_constraint_vars:
+                    # Combine both objectives
+                    other_obj = " + ".join(other_constraint_vars) if other_constraint_vars else "0.0"
+                    # TODO check the last variable, based on BAND and BOR generate the code, need to change
+                    #  ExpressionGenerator!!!!!!!!!!!!!!!
+                    objective_computation = f"""
+// Compute projection objective for linear equalities
+double obj_linear_eq = compute_projection_objective({", ".join(symbolTable.keys())});
+// Compute squared distance objective for other constraints
+double obj_others = {other_obj};
+// Combined objective
+double final_objective = obj_linear_eq + obj_others;"""
+                    return_expr = "final_objective"
+                else:
+                    # Only projection objective
+                    objective_computation = f"""
+// Compute projection objective for linear equalities only
+double final_objective = compute_projection_objective({", ".join(symbolTable.keys())});"""
+                    return_expr = "final_objective"
+            # Build variable declarations
         var_declarations = []
         parse_formats = []
         var_refs = []
-        for var_name, var_type in self.expr_generator.symbolTable.items():
+        for var_name, var_type in symbolTable.items():
             if var_type == Sort.Float32:
                 var_declarations.append(f"float {var_name};")
                 parse_formats.append("f")
@@ -53,18 +83,78 @@ class CodeGenerator:
                 var_refs.append(f"&{var_name}")
             else:
                 raise NotImplementedError("Unknown types in SMT")
-        x_expr = verification.var_name(expr_z3)
         x_body = '\n  '.join(self.expr_generator.result)
-        x_dim = len(self.expr_generator.symbolTable)
+        x_dim = len(symbolTable)
+        x_expr = "final_objective"
         code = self.template.get_template() % {
+            "matrix_functions": matrix_code,
             "var_declarations": "\n  ".join(var_declarations),
             "parse_formats": "".join(parse_formats),
             "var_refs": ", ".join(var_refs),
-            "x_expr": x_expr,
+            "x_body": x_body,
+            "objective_computation": objective_computation,
+            "return_expr": return_expr,
             "x_dim": x_dim,
-            "x_body": x_body
+            "x_expr": x_expr,
         }
-        return self.expr_generator.symbolTable, code
+        return symbolTable, code
+
+    def _generate_matrix_code(self, A, b, symbolTable):
+        """Generate C code for matrix operations."""
+        m, n = A.shape
+
+        # Convert matrices to C arrays
+        A_init = self._matrix_to_c_init(A)
+        b_init = self._vector_to_c_init(b.flatten())
+
+        code = f"""
+// Matrix operations for projection-based objective
+// A is {m}x{n}, b is {m}x1
+
+static double compute_projection_objective({", ".join([f"double {var}" for var in symbolTable.keys()])}) {{
+    // Matrix A
+    static const double A[{m}][{n}] = {A_init};
+
+    // Vector b
+    static const double b[{m}] = {b_init};
+
+    // Input vector z
+    double z[{n}] = {{{", ".join([var for var in symbolTable.keys()])}}};
+
+    // Compute Az - b
+    double residual[{m}];
+    for (int i = 0; i < {m}; i++) {{
+        residual[i] = -b[i];
+        for (int j = 0; j < {n}; j++) {{
+            residual[i] += A[i][j] * z[j];
+        }}
+    }}
+
+    // For now, use squared norm of residual
+    // This is equivalent to the full projection formula when A has full row rank
+    double obj = 0.0;
+    for (int i = 0; i < {m}; i++) {{
+        obj += residual[i] * residual[i];
+    }}
+
+    return obj;
+}}
+"""
+        return code
+
+    def _matrix_to_c_init(self, matrix):
+        """Convert numpy matrix to C array initializer."""
+        rows, cols = matrix.shape
+        rows_str = []
+        for i in range(rows):
+            row_vals = ", ".join([f"{matrix[i, j]:.17e}" for j in range(cols)])
+            rows_str.append(f"{{{row_vals}}}")
+        return f"{{{', '.join(rows_str)}}}"
+
+    def _vector_to_c_init(self, vector):
+        """Convert numpy vector to C array initializer."""
+        vals_str = ", ".join([f"{val:.17e}" for val in vector])
+        return f"{{{vals_str}}}"
 
 def print_xsat_info():
     """Print XSat banner information."""

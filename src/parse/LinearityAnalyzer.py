@@ -58,7 +58,6 @@ class LinearityAnalyzer:
             rhs_is_const = z3_util.is_value(rhs)
             lhs_linear = self.is_linear(lhs, symbolTable, cache)
             rhs_linear = self.is_linear(rhs, symbolTable, cache)
-
             is_linear = (lhs_is_const and rhs_linear) or (rhs_is_const and lhs_linear)
             self.linearity_info[expr_id] = (is_linear, f"MUL(const={lhs_is_const or rhs_is_const})")
             return is_linear
@@ -68,7 +67,6 @@ class LinearityAnalyzer:
             rhs = expr_z3.arg(2)
             rhs_is_const = z3_util.is_value(rhs)
             lhs_linear = self.is_linear(lhs, symbolTable, cache)
-
             is_linear = rhs_is_const and lhs_linear
             self.linearity_info[expr_id] = (is_linear, f"DIV(divisor_const={rhs_is_const})")
             return is_linear
@@ -100,6 +98,10 @@ class LinearityAnalyzer:
         if z3.is_not(expr_z3) and expr_z3.num_args() >= 1:
             is_linear = self.is_linear(expr_z3.arg(0), symbolTable, cache)
             self.linearity_info[expr_id] = (is_linear, "NOT")
+            return is_linear
+        if z3_util.is_fpNeg(expr_z3):
+            is_linear = self.is_linear(expr_z3.arg(0), symbolTable, cache)
+            self.linearity_info[expr_id] = (is_linear, "fpNeg")
             return is_linear
         # Default: non-linear
         self.linearity_info[expr_id] = (False, f"UNKNOWN(kind={sort_z3})")

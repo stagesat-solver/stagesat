@@ -1,18 +1,24 @@
 class CodeTemplate:
-    """Manages C code templates."""
+    """Manages C code templates with hybrid objective support."""
 
     @staticmethod
     def get_template():
-        """Return the C code template for Python C extension module."""
+        """Return the C code template for Python C extension module with hybrid objective."""
         return """#include <Python.h>
 #include "xsat.h"
 #include <math.h>
+
+%(matrix_functions)s
+
 static PyObject* R(PyObject* self, PyObject *args){
 
   %(var_declarations)s
   if (!PyArg_ParseTuple(args,"%(parse_formats)s", %(var_refs)s))
     return NULL;
   %(x_body)s
+
+  %(objective_computation)s
+
   return Py_BuildValue("d",%(x_expr)s);
 }
 
