@@ -7,6 +7,7 @@ import src.utils.verification as verification
 
 DEBUG = False
 
+
 class LinearConstraintExtractor:
     """Extracts linear equality constraints and builds matrix A and vector b."""
 
@@ -16,6 +17,9 @@ class LinearConstraintExtractor:
         self.n_vars = len(symbolTable)
         self.linear_eq_constraints = []
         self.other_constraints = []
+        # New: track variables used in linear equalities
+        self.linear_vars = collections.OrderedDict()  # Variables actually in linear eq constraints
+        self.linear_var_to_index = {}  # Mapping for matrix columns
 
     def extract_coefficient(self, expr_z3, var_name: str) -> float:
         """Extract the coefficient of a variable in a linear expression."""
@@ -133,17 +137,28 @@ class LinearConstraintExtractor:
         else:
             return float(str(expr_z3))
 
+    def _collect_variables_in_expr(self, expr_z3, var_set: set):
+        """Recursively collect all variables that appear in an expression."""
+        if z3_util.is_variable(expr_z3):
+            var_name = verification.rename_var(expr_z3.decl().name())
+            if var_name in self.symbolTable:
+                var_set.add(var_name)
+        else:
+            for i in range(expr_z3.num_args()):
+                self._collect_variables_in_expr(expr_z3.arg(i), var_set)
+
     def process_linear_equality(self, lhs_expr, rhs_expr) -> Optional[Tuple[np.ndarray, float]]:
         """
         Process a linear equality constraint lhs = rhs.
         Returns (coefficients, constant) where the constraint is: coefficients @ vars = constant
+        Uses only variables in linear_vars, not all symbolTable variables.
         """
         # For constraint lhs = rhs, rewrite as (lhs - rhs) = 0
-        coefficients = np.zeros(self.n_vars)
-        for var_name in self.symbolTable.keys():
+        coefficients = np.zeros(len(self.linear_vars))
+        for var_name in self.linear_vars.keys():
             lhs_coef = self.extract_coefficient(lhs_expr, var_name)
             rhs_coef = self.extract_coefficient(rhs_expr, var_name)
-            coefficients[self.var_to_index[var_name]] = lhs_coef - rhs_coef
+            coefficients[self.linear_var_to_index[var_name]] = lhs_coef - rhs_coef
         # Constant term: rhs_const - lhs_const
         lhs_const = self.extract_constant_term(lhs_expr)
         rhs_const = self.extract_constant_term(rhs_expr)
@@ -154,9 +169,26 @@ class LinearConstraintExtractor:
         """
         Build matrix A and vector b from linear equality constraints.
         Returns (A, b) where A is m x n and b is m x 1
+        Only includes variables that appear in the linear equality constraints.
         """
         if not self.linear_eq_constraints:
             return None, None
+
+        # First pass: collect all variables that appear in linear equality constraints
+        vars_in_constraints = set()
+        for lhs_expr, rhs_expr in self.linear_eq_constraints:
+            self._collect_variables_in_expr(lhs_expr, vars_in_constraints)
+            self._collect_variables_in_expr(rhs_expr, vars_in_constraints)
+
+        # Build linear_vars in the same order as symbolTable
+        for var_name, var_type in self.symbolTable.items():
+            if var_name in vars_in_constraints:
+                self.linear_vars[var_name] = var_type
+
+        # Create index mapping for linear vars
+        self.linear_var_to_index = {var: i for i, var in enumerate(self.linear_vars.keys())}
+
+        # Second pass: build matrix rows
         A_rows = []
         b_vals = []
         for lhs_expr, rhs_expr in self.linear_eq_constraints:
@@ -165,68 +197,10 @@ class LinearConstraintExtractor:
                 coefficients, constant = result
                 A_rows.append(coefficients)
                 b_vals.append(constant)
+
         if not A_rows:
             return None, None
+
         A = np.array(A_rows)
         b = np.array(b_vals).reshape(-1, 1)
         return A, b
-
-    def generate_projection_c_code(self) -> Tuple[str, str]:
-        """
-        Generate C code for the projection-based objective function.
-        Returns (matrix_functions_code, objective_computation_code)
-        """
-        A, b = self.build_matrices()
-        if A is None:
-            return "", ""
-        m, n = A.shape
-        # Generate C arrays for A and b
-        A_init = self._matrix_to_c_init(A)
-        b_init = self._vector_to_c_init(b.flatten())
-        matrix_functions = f"""
-// Projection-based objective for linear equality constraints
-// Matrix A is {m}x{n}, vector b is {m}x1
-static double compute_projection_objective({", ".join([f"double {var}" for var in self.symbolTable.keys()])}) {{
-    static const double A[{m}][{n}] = {A_init};
-    static const double b[{m}] = {b_init};
-
-    double z[{n}] = {{{", ".join([var for var in self.symbolTable.keys()])}}};
-    double residual[{m}];
-
-    // Compute Az - b
-    for (int i = 0; i < {m}; i++) {{
-        residual[i] = -b[i];
-        for (int j = 0; j < {n}; j++) {{
-            residual[i] += A[i][j] * z[j];
-        }}
-    }}
-
-    // Squared norm of residual
-    double obj = 0.0;
-    for (int i = 0; i < {m}; i++) {{
-        obj += residual[i] * residual[i];
-    }}
-
-    return obj;
-}}
-"""
-
-        objective_computation = f"""
-  // Compute projection objective for linear equalities
-  double obj_linear_eq = compute_projection_objective({", ".join(self.symbolTable.keys())});"""
-
-        return matrix_functions, objective_computation
-
-    def _matrix_to_c_init(self, matrix: np.ndarray) -> str:
-        """Convert numpy matrix to C array initializer."""
-        rows, cols = matrix.shape
-        rows_str = []
-        for i in range(rows):
-            row_vals = ", ".join([f"{matrix[i, j]:.17e}" for j in range(cols)])
-            rows_str.append(f"{{{row_vals}}}")
-        return f"{{{', '.join(rows_str)}}}"
-
-    def _vector_to_c_init(self, vector: np.ndarray) -> str:
-        """Convert numpy vector to C array initializer."""
-        vals_str = ", ".join([f"{val:.17e}" for val in vector])
-        return f"{{{vals_str}}}"

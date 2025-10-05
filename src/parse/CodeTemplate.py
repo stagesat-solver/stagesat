@@ -54,3 +54,51 @@ PyInit_foo(void)
   return module;
 }
 """
+
+    @staticmethod
+    def get_template_ulp():
+        """Return the C code template for Python C extension module."""
+        return """#include <Python.h>
+    #include "xsat.h"
+    #include <math.h>
+    static PyObject* R(PyObject* self, PyObject *args){
+
+      %(var_declarations)s
+      if (!PyArg_ParseTuple(args,"%(parse_formats)s", %(var_refs)s))
+        return NULL;
+      %(x_body)s
+      return Py_BuildValue("d",%(x_expr)s);
+    }
+
+    static PyMethodDef methods[] = {
+      {"R", R, METH_VARARGS, NULL},
+      {NULL, NULL, 0, NULL}
+    };
+
+    static struct PyModuleDef moduledef = {
+      PyModuleDef_HEAD_INIT,
+      #ifdef MODULE_NAME
+        MODULE_NAME,
+      #else
+        "foo",
+      #endif
+      NULL,            /* m_doc */
+      -1,              /* m_size */
+      methods,         /* m_methods */
+      NULL,            /* m_reload */
+      NULL,            /* m_traverse */
+      NULL,            /* m_clear */
+      NULL,            /* m_free */
+    };
+
+    PyMODINIT_FUNC
+    PyInit_foo(void)
+    {
+      PyObject* module = PyModule_Create(&moduledef);
+      if (module == NULL)
+        return NULL;
+
+      PyModule_AddIntConstant(module, "dim", %(x_dim)s);
+      return module;
+    }
+    """

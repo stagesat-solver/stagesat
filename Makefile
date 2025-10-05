@@ -3,13 +3,13 @@ SHELL := /bin/bash
 UNAMES=$(shell uname -s)
 ifeq ($(UNAMES),Linux)
 	DLIBFLAG=-shared
-    PYTHONINC := $(shell python3-config --includes)
-    PYTHONLIB := $(shell python3-config --ldflags)
+	PYTHONINC := $(shell python3-config --includes)
+	PYTHONLIB := $(shell python3-config --ldflags)
 endif
 ifeq ($(UNAMES),Darwin)
 	DLIBFLAG=-dynamiclib
 	PYTHONINC := $(shell python3-config --includes)
-    PYTHONLIB := $(shell python3-config --ldflags)
+	PYTHONLIB := $(shell python3-config --ldflags)
 endif
 
 
@@ -35,7 +35,7 @@ define XSAT_echo
 endef
 
 
-all:  compile
+all: clean compile
 
 gen:  build/foo.c xsat_gen.py
 build/foo.c: $(IN)  XSAT_IN.txt
@@ -44,37 +44,37 @@ build/foo.c: $(IN)  XSAT_IN.txt
 	python xsat_gen.py $<  > $@
 
 compile_square: build/R_square/foo_square.so
-build/R_square/foo_square.so: build/foo.c include/R_square/xsat.h $(IN)
+build/R_square/foo_square.so: include/R_square/xsat.h $(IN)
+	@echo "[XSAT] .smt2 -> build/foo_square.c (square mode)"
+	@mkdir -p build
+	@python xsat_gen.py $(IN) --square > build/foo_square.c
 	@echo [XSAT]Compiling the representing function as $@
 	@mkdir -p build/R_square
-	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
+	@clang -O3 -fPIC build/foo_square.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_square \
 		-DMODULE_NAME=\"foo_square\" \
 		-fbracket-depth=3000
 
-compile_verify: build/R_verify/foo.so
-build/R_verify/foo.so: build/foo.c include/R_verify/xsat.h  $(IN)
-	@echo [XSAT]Compiling the representing function as $@
-	@mkdir -p build/R_verify
-	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@  $(PYTHONINC) -I include/R_ulp  $(PYTHONLIB) -fbracket-depth=3000
-
 compile_ulp: build/R_ulp/foo_ulp.so
-build/R_ulp/foo_ulp.so: build/foo.c include/R_ulp/xsat.h $(IN)
+build/R_ulp/foo_ulp.so: include/R_ulp/xsat.h $(IN)
+	@echo "[XSAT] .smt2 -> build/foo_ulp.c (ulp mode)"
+	@mkdir -p build
+	@python xsat_gen.py $(IN) --ulp > build/foo_ulp.c
 	@echo [XSAT]Compiling the representing function as $@
 	@mkdir -p build/R_ulp
-	@clang -O3 -fPIC $< $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_ulp $(PYTHONLIB) \
+	@clang -O3 -fPIC build/foo_ulp.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_ulp $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_ulp \
 		-DMODULE_NAME=\"foo_ulp\" \
 		-fbracket-depth=3000
 
-compile:  compile_ulp compile_square
+compile: compile_square compile_ulp
 
 solve: compile
 	@echo [XSAT] Executing the solver.
 	@python xsat.py
 
 test: test_benchmarks.py
-	python $<
+	python $
 
 helloworld: Benchmarks/div3.c.50.smt2
 	make IN=$>
@@ -82,9 +82,9 @@ helloworld: Benchmarks/div3.c.50.smt2
 
 clean:
 	$(XSAT_echo) Cleaning build/ and Results/
-	@rm -vf build/foo.c build/foo.symbolTable
+	@rm -vf build/foo.c build/foo_square.c build/foo_ulp.c build/foo.symbolTable
 	@rm -vfr build/R_square build/R_ulp build/R_verify
 	@rm -vf Results/*
 
 
-.PHONY: copy gen clean compile compile_square test
+.PHONY: copy gen clean compile compile_square compile_ulp test

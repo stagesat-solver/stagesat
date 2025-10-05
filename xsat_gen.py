@@ -9,6 +9,7 @@ from src.parse import LinearConstraintExtractor, ExpressionGenerator, CodeTempla
 
 DEBUG = False
 
+
 class CodeGenerator:
     """Main orchestrator for code generation from Z3 expressions."""
 
@@ -17,7 +18,7 @@ class CodeGenerator:
         self.expr_generator = ExpressionGenerator(self.linearity_analyzer)
         self.template = CodeTemplate()
 
-    def generate(self, expr_z3):
+    def generate_square(self, expr_z3):
         """Generate C code from Z3 expression."""
         # Reset state
         self.linearity_analyzer.reset()
@@ -47,14 +48,16 @@ class CodeGenerator:
             extractor.linear_eq_constraints = linear_eq_constraints
             A, b = extractor.build_matrices()
             if A is not None:
-                matrix_code = self._generate_matrix_code(A, b, symbolTable)
+                # Pass extractor.linear_vars instead of symbolTable
+                matrix_code = self._generate_matrix_code(A, b, extractor.linear_vars)
                 # Generate combined objective
                 if other_constraint_vars:
                     # Combine both objectives
                     other_obj = " + ".join(other_constraint_vars) if other_constraint_vars else "0.0"
+                    # Only pass linear_vars to projection function
                     objective_computation = f"""
 // Compute projection objective for linear equalities
-double obj_linear_eq = compute_projection_objective({", ".join(symbolTable.keys())});
+double obj_linear_eq = compute_projection_objective({", ".join(extractor.linear_vars.keys())});
 // Compute squared distance objective for other constraints
 double obj_others = {other_obj};
 // Combined objective
@@ -64,7 +67,7 @@ double final_objective = obj_linear_eq + obj_others;"""
                     # Only projection objective
                     objective_computation = f"""
 // Compute projection objective for linear equalities only
-double final_objective = compute_projection_objective({", ".join(symbolTable.keys())});"""
+double final_objective = compute_projection_objective({", ".join(extractor.linear_vars.keys())});"""
                     return_expr = "final_objective"
             # Build variable declarations
         var_declarations = []
@@ -97,42 +100,109 @@ double final_objective = compute_projection_objective({", ".join(symbolTable.key
         }
         return symbolTable, code
 
-    def _generate_matrix_code(self, A, b, symbolTable):
-        """Generate C code for matrix operations."""
+    def generate_ulp(self, expr_z3):
+        """Generate C code from Z3 expression."""
+        # Reset state
+        self.linearity_analyzer.reset()
+        self.expr_generator.reset()
+        # Generate code
+        self.expr_generator.generate(expr_z3)
+        if len(self.expr_generator.symbolTable) == 0:
+            return self.expr_generator.symbolTable, 'int main(){return 0;}'
+        # Build variable declarations
+        var_declarations = []
+        parse_formats = []
+        var_refs = []
+        for var_name, var_type in self.expr_generator.symbolTable.items():
+            if var_type == Sort.Float32:
+                var_declarations.append(f"float {var_name};")
+                parse_formats.append("f")
+                var_refs.append(f"&{var_name}")
+            elif var_type == Sort.Float64:
+                var_declarations.append(f"double {var_name};")
+                parse_formats.append("d")
+                var_refs.append(f"&{var_name}")
+            else:
+                raise NotImplementedError("Unknown types in SMT")
+        x_expr = verification.var_name(expr_z3)
+        x_body = '\n  '.join(self.expr_generator.result)
+        x_dim = len(self.expr_generator.symbolTable)
+        code = self.template.get_template_ulp() % {
+            "var_declarations": "\n  ".join(var_declarations),
+            "parse_formats": "".join(parse_formats),
+            "var_refs": ", ".join(var_refs),
+            "x_expr": x_expr,
+            "x_dim": x_dim,
+            "x_body": x_body
+        }
+        return self.expr_generator.symbolTable, code
+
+    def _generate_matrix_code(self, A, b, linear_vars):
+        """Generate C code for matrix operations using projection formula.
+
+        Args:
+            A: Coefficient matrix (m x n)
+            b: Constant vector (m x 1)
+            linear_vars: OrderedDict of variables that appear in linear constraints
+        """
+        import numpy as np
         m, n = A.shape
+
+        # Precompute AA^T and its inverse
+        AAT = A @ A.T  # m x m
+        AAT_inv = np.linalg.inv(AAT)  # m x m
+
+        # Precompute A^T * (AA^T)^(-1)
+        AT_AAT_inv = A.T @ AAT_inv  # n x m
 
         # Convert matrices to C arrays
         A_init = self._matrix_to_c_init(A)
         b_init = self._vector_to_c_init(b.flatten())
+        AT_AAT_inv_init = self._matrix_to_c_init(AT_AAT_inv)
 
         code = f"""
-// Matrix operations for projection-based objective
+// Projection-based objective for linear equality constraints
+// Formula: g(z) = ||A^T(AA^T)^(-1)(Az - b)||^2
 // A is {m}x{n}, b is {m}x1
+// Only uses {n} variables that appear in linear constraints
 
-static double compute_projection_objective({", ".join([f"double {var}" for var in symbolTable.keys()])}) {{
+static double compute_projection_objective({", ".join([f"double {var}" for var in linear_vars.keys()])}) {{
     // Matrix A
     static const double A[{m}][{n}] = {A_init};
 
     // Vector b
     static const double b[{m}] = {b_init};
 
-    // Input vector z
-    double z_input[{n}] = {{{", ".join([var for var in symbolTable.keys()])}}};
+    // Precomputed A^T * (AA^T)^(-1), which is {n}x{m}
+    static const double AT_AAT_inv[{n}][{m}] = {AT_AAT_inv_init};
 
-    // Compute Az - b
+    // Input vector z (only variables in linear constraints)
+    double z[{n}] = {{{", ".join([var for var in linear_vars.keys()])}}};
+
+    // Step 1: Compute residual r = Az - b
     double residual[{m}];
     for (int i = 0; i < {m}; i++) {{
         residual[i] = -b[i];
         for (int j = 0; j < {n}; j++) {{
-            residual[i] += A[i][j] * z_input[j];
+            residual[i] += A[i][j] * z[j];
         }}
     }}
 
-    // For now, use squared norm of residual
-    // This is equivalent to the full projection formula when A has full row rank
+    // Step 2: Compute projection_vector = A^T * (AA^T)^(-1) * residual
+    // This is an {n}-dimensional vector
+    double proj_vec[{n}];
+    for (int i = 0; i < {n}; i++) {{
+        proj_vec[i] = 0.0;
+        for (int j = 0; j < {m}; j++) {{
+            proj_vec[i] += AT_AAT_inv[i][j] * residual[j];
+        }}
+    }}
+
+    // Step 3: Compute squared norm of projection_vector
+    // This is the distance-to-feasible-set objective
     double obj = 0.0;
-    for (int i = 0; i < {m}; i++) {{
-        obj += residual[i] * residual[i];
+    for (int i = 0; i < {n}; i++) {{
+        obj += proj_vec[i] * proj_vec[i];
     }}
 
     return obj;
@@ -145,14 +215,15 @@ static double compute_projection_objective({", ".join([f"double {var}" for var i
         rows, cols = matrix.shape
         rows_str = []
         for i in range(rows):
-            row_vals = ", ".join([f"{matrix[i, j]:.17e}" for j in range(cols)])
+            row_vals = ", ".join([f"{matrix[i, j]:.16e}" for j in range(cols)])
             rows_str.append(f"{{{row_vals}}}")
         return f"{{{', '.join(rows_str)}}}"
 
     def _vector_to_c_init(self, vector):
         """Convert numpy vector to C array initializer."""
-        vals_str = ", ".join([f"{val:.17e}" for val in vector])
+        vals_str = ", ".join([f"{val:.16e}" for val in vector])
         return f"{{{vals_str}}}"
+
 
 def print_xsat_info():
     """Print XSat banner information."""
@@ -167,30 +238,13 @@ def print_xsat_info():
     print("Contributors: Zhoulai Fu and Zhendong Su")
     print("*" * 50)
 
+
 def get_parser():
     """Create and return argument parser."""
-    parser = argparse.ArgumentParser(prog='XSat')
+    parser = argparse.ArgumentParser(prog='XSat', allow_abbrev=False)
     parser.add_argument('smt2_file', help='specify the smt2 file to analyze.',
                         type=argparse.FileType('r'))
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 12/18/2015')
-    parser.add_argument('--niter', help='niter in basinhopping', action='store',
-                        type=int, required=False, default=100)
-    parser.add_argument('--nStartOver', help='startOver times', action='store',
-                        type=int, required=False, default=2)
-    parser.add_argument('--method', help='Local minimization procedure', default='powell',
-                        choices=['powell', 'slsqp', 'cg', 'l-bfgs-b', 'cobyla', 'tnc',
-                                 'bfgs', 'nelder-mead', 'noop_min'])
-    parser.add_argument('--showTime', help='show the time-related info (default: false)',
-                        action='store_true', default=False)
-    parser.add_argument('--showResult', help='show the basinhopping output (default:false)',
-                        action='store_true', default=False)
-    parser.add_argument('--stepSize', help='parameter of basinhopping',
-                        type=float, default=10.0)
-    parser.add_argument('--stepSize_round2', help='parameter of basinhopping',
-                        type=float, default=100.0)
-    parser.add_argument('--verify', help='verify the model', action='store_true', default=False)
-    parser.add_argument('--verify2', help='verify the model (method 2)',
-                        action='store_true', default=False)
     parser.add_argument('--showModel', help='show the model as a var->value mapping',
                         action='store_true', default=False)
     parser.add_argument('--showSymbolTable', help='show the symbol table, var->type',
@@ -203,19 +257,16 @@ def get_parser():
     parser.add_argument('--command_compilation',
                         help='the command used to compile the generated foo.c to foo.so',
                         default='clang -O3 -fbracket-depth=2048 -fPIC')
-    parser.add_argument('--startPoint', help='start point in a single dimension',
-                        action='store', type=float, default=1.0)
     parser.add_argument("--multi", help="multi-processing (default: false)",
                         default=False, action='store_true')
     parser.add_argument("--multiMessage", help="multi-processing message",
                         default=False, action='store_true')
-    parser.add_argument("--round2", help="activate round2 when unsat (default: false)",
-                        default=False, action='store_true')
-    parser.add_argument("--niter_round2", help="niter for round2", action='store',
-                        type=int, required=False, default=100)
     parser.add_argument("--suppressWarning", help="Suppress warnings",
                         default=False, action='store_true')
+    parser.add_argument('--square', action='store_true')
+    parser.add_argument('--ulp', action='store_true')
     return parser
+
 
 if __name__ == "__main__":
     parser = get_parser()
@@ -235,7 +286,13 @@ if __name__ == "__main__":
         sys.stderr.write("[Xsat] The Z3 front-end crashes.\n")
         sys.exit(1)
     generator = CodeGenerator()
-    symbolTable, foo_dot_c = generator.generate(expr_z3)
+    if args.square:
+        symbolTable, foo_dot_c = generator.generate_square(expr_z3)
+    elif args.ulp:
+        symbolTable, foo_dot_c = generator.generate_ulp(expr_z3)
+    else:
+        print("Error: Must specify either --square or --ulp", file=sys.stderr)
+        sys.exit(1)
     args.smt2_file.close()
     os.makedirs("build", exist_ok=True)
     pickle.dump(symbolTable, open("build/foo.symbolTable", "wb"))
