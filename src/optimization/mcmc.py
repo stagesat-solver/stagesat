@@ -112,27 +112,27 @@ def mcmc(args, i):
         if res.fun >= args.round2_threshold:
             continue
         ########################################################################################
-        # if args.showTime:
-        #     print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        # sp2 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
-        # res_round2 = op.basinhopping(
-        #     lambda X: foo_ulp.R(*scale(X, i)),
-        #     sp2,
-        #     niter=args.round2_niter,
-        #     stepsize=args.round2_stepsize,
-        #     minimizer_kwargs=_minimizer_kwargs,
-        #     callback=_callback_global
-        # )
-        # R_star = res_round2.fun
-        # X_star = scale(tr_help(res_round2.x), i)
-        # if R_star < best_R_star:
-        #     best_R_star = R_star
-        #     best_X_star = X_star
-        #     print(f"//////////////////////////////R2 found a best_R_star: {best_R_star} + R1: {res.fun}")
-        # if best_R_star == 0:
-        #     break
-        # if res_round2.fun >= args.round3_threshold:
-        #     continue
+        if args.showTime:
+            print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        sp2 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
+        res_round2 = op.basinhopping(
+            lambda X: foo_ulp.R(*scale(X, i)),
+            sp2,
+            niter=args.round2_niter,
+            stepsize=args.round2_stepsize,
+            minimizer_kwargs=_minimizer_kwargs,
+            callback=_callback_global
+        )
+        R_star = res_round2.fun
+        X_star = scale(tr_help(res_round2.x), i)
+        if R_star < best_R_star:
+            best_R_star = R_star
+            best_X_star = X_star
+            print(f"//////////////////////////////R2 found a best_R_star: {best_R_star} + R1: {res.fun}")
+        if best_R_star == 0:
+            break
+        if res_round2.fun >= args.round3_threshold:
+            continue
         ########################################################################################
         if args.showTime:
             print("[Xsat] round3_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")

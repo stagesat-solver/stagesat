@@ -5,7 +5,7 @@ import warnings
 import pickle
 import src.utils.verification as verification
 from src.utils.sort import Sort
-from src.parse import LinearConstraintExtractor, ExpressionGenerator, CodeTemplate, LinearityAnalyzer
+from src.parse import LinearConstraintExtractor, ExpressionGenerator, CodeTemplate
 
 DEBUG = False
 
@@ -14,14 +14,12 @@ class CodeGenerator:
     """Main orchestrator for code generation from Z3 expressions."""
 
     def __init__(self):
-        self.linearity_analyzer = LinearityAnalyzer()
-        self.expr_generator = ExpressionGenerator(self.linearity_analyzer)
+        self.expr_generator = ExpressionGenerator()
         self.template = CodeTemplate()
 
     def generate_square(self, expr_z3):
         """Generate C code from Z3 expression."""
         # Reset state
-        self.linearity_analyzer.reset()
         self.expr_generator.reset()
         # Generate code
         main_expr = self.expr_generator.generate(expr_z3)
@@ -33,8 +31,8 @@ class CodeGenerator:
         other_constraint_vars = []
         for constraint_id, lhs_expr, rhs_expr in self.expr_generator.linear_eq_constraints:
             # Check if both sides are linear
-            lhs_linear = self.linearity_analyzer.is_linear(lhs_expr, symbolTable, self.expr_generator.cache)
-            rhs_linear = self.linearity_analyzer.is_linear(rhs_expr, symbolTable, self.expr_generator.cache)
+            lhs_linear = self.expr_generator.is_linear(lhs_expr, symbolTable, self.expr_generator.cache)
+            rhs_linear = self.expr_generator.is_linear(rhs_expr, symbolTable, self.expr_generator.cache)
             if lhs_linear and rhs_linear:
                 linear_eq_constraints.append((lhs_expr, rhs_expr))
             else:
@@ -103,7 +101,6 @@ double final_objective = compute_projection_objective({", ".join(extractor.linea
     def generate_ulp(self, expr_z3):
         """Generate C code from Z3 expression."""
         # Reset state
-        self.linearity_analyzer.reset()
         self.expr_generator.reset()
         # Generate code
         self.expr_generator.generate(expr_z3)

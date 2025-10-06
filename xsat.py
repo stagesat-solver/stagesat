@@ -20,7 +20,7 @@ from src.core.config import SolverConfig
 from src.utils.sort import Sort
 import src.optimization.mcmc as op_mcmc
 import src.utils.verification as verification
-np.set_printoptions(precision=2000, suppress=True)
+np.set_printoptions(precision=170, suppress=True)
 
 def str2bool(v: str) -> bool:
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -73,12 +73,12 @@ def get_parser():
     parser.add_argument('--startPoint', help='start point in a single dimension', action='store', type=float,
                         default=1.0)
     parser.add_argument('--round2_threshold', help='threshold_low for round2', action='store', type=float, default=8e-11)
-    parser.add_argument('--round3_threshold', help='threshold  for round3', action='store', type=float, default=1000)
+    parser.add_argument('--round3_threshold', help='threshold  for round3', action='store', type=float, default=1e10)
     parser.add_argument("--multi", help="multi-processing (default: true)", default=True, action='store', type=str2bool)
     # parser.add_argument("--single", help="single processor  (default: true)",default=True,action='store')
     # parser.add_argument("--round2", help="activate round2 when unsat (default: false)",default=False,action='store_true')
     parser.add_argument("--round2_niter", help="niter for round2", action='store', type=int, required=False, default=50)
-    parser.add_argument("--round3_niter", help="niter for round3", action='store', type=int, required=False, default=100)
+    parser.add_argument("--round3_niter", help="niter for round3", action='store', type=int, required=False, default=50)
     parser.add_argument("--round3_stepsize", help="stepsize for round3", action='store', type=float, required=False,
                         default=10.0)
     parser.add_argument("--suppressWarning", help="Suppress warnings", default=False, action='store_true')
