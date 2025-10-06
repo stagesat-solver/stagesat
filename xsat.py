@@ -78,7 +78,7 @@ def get_parser():
     # parser.add_argument("--single", help="single processor  (default: true)",default=True,action='store')
     # parser.add_argument("--round2", help="activate round2 when unsat (default: false)",default=False,action='store_true')
     parser.add_argument("--round2_niter", help="niter for round2", action='store', type=int, required=False, default=50)
-    parser.add_argument("--round3_niter", help="niter for round3", action='store', type=int, required=False, default=30)
+    parser.add_argument("--round3_niter", help="niter for round3", action='store', type=int, required=False, default=100)
     parser.add_argument("--round3_stepsize", help="stepsize for round3", action='store', type=float, required=False,
                         default=10.0)
     parser.add_argument("--suppressWarning", help="Suppress warnings", default=False, action='store_true')

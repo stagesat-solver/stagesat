@@ -1,5 +1,8 @@
 #ifndef _XSAT_H_
 #define _XSAT_H_
+#ifdef __cplusplus
+extern "C" {
+#endif
 //MUST BE NEAGATIVE!!
 #define EPSILON 0
 #include <math.h>
@@ -96,5 +99,8 @@ double  BOR(double x, double y){return x * y;}
 float TR32(double x){
   return (float)x;
 }
+#ifdef __cplusplus
+}
+#endif
 #endif
 

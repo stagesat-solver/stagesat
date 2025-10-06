@@ -3,57 +3,61 @@ class CodeTemplate:
 
     @staticmethod
     def get_template():
-        """Return the C code template for Python C extension module with hybrid objective."""
+        """Return the C++ code template for Python C extension module with hybrid objective."""
         return """#include <Python.h>
-#include "xsat.h"
-#include <math.h>
+    #include "xsat.h"
+    #include <math.h>
 
-%(matrix_functions)s
+    %(matrix_functions)s
 
-static PyObject* R(PyObject* self, PyObject *args){
+    extern "C" {
 
-  %(var_declarations)s
-  if (!PyArg_ParseTuple(args,"%(parse_formats)s", %(var_refs)s))
-    return NULL;
-  %(x_body)s
+    static PyObject* R(PyObject* self, PyObject *args){
 
-  %(objective_computation)s
+      %(var_declarations)s
+      if (!PyArg_ParseTuple(args,"%(parse_formats)s", %(var_refs)s))
+        return NULL;
+      %(x_body)s
 
-  return Py_BuildValue("d",%(x_expr)s);
-}
+      %(objective_computation)s
 
-static PyMethodDef methods[] = {
-  {"R", R, METH_VARARGS, NULL},
-  {NULL, NULL, 0, NULL}
-};
+      return Py_BuildValue("d",%(x_expr)s);
+    }
 
-static struct PyModuleDef moduledef = {
-  PyModuleDef_HEAD_INIT,
-  #ifdef MODULE_NAME
-    MODULE_NAME,
-  #else
-    "foo",
-  #endif
-  NULL,            /* m_doc */
-  -1,              /* m_size */
-  methods,         /* m_methods */
-  NULL,            /* m_reload */
-  NULL,            /* m_traverse */
-  NULL,            /* m_clear */
-  NULL,            /* m_free */
-};
+    static PyMethodDef methods[] = {
+      {"R", R, METH_VARARGS, NULL},
+      {NULL, NULL, 0, NULL}
+    };
 
-PyMODINIT_FUNC
-PyInit_foo(void)
-{
-  PyObject* module = PyModule_Create(&moduledef);
-  if (module == NULL)
-    return NULL;
+    static struct PyModuleDef moduledef = {
+      PyModuleDef_HEAD_INIT,
+      #ifdef MODULE_NAME
+        MODULE_NAME,
+      #else
+        "foo",
+      #endif
+      NULL,
+      -1,
+      methods,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+    };
 
-  PyModule_AddIntConstant(module, "dim", %(x_dim)s);
-  return module;
-}
-"""
+    PyMODINIT_FUNC
+    PyInit_foo(void)
+    {
+      PyObject* module = PyModule_Create(&moduledef);
+      if (module == NULL)
+        return NULL;
+
+      PyModule_AddIntConstant(module, "dim", %(x_dim)s);
+      return module;
+    }
+
+    }  // extern "C"
+    """
 
     @staticmethod
     def get_template_ulp():

@@ -138,7 +138,7 @@ double final_objective = compute_projection_objective({", ".join(extractor.linea
         return self.expr_generator.symbolTable, code
 
     def _generate_matrix_code(self, A, b, linear_vars):
-        """Generate C code for matrix operations using projection formula.
+        """Generate C++ code for matrix operations using Eigen library.
 
         Args:
             A: Coefficient matrix (m x n)
@@ -148,82 +148,62 @@ double final_objective = compute_projection_objective({", ".join(extractor.linea
         import numpy as np
         m, n = A.shape
 
-        # Precompute AA^T and its inverse
-        AAT = A @ A.T  # m x m
-        AAT_inv = np.linalg.inv(AAT)  # m x m
-
-        # Precompute A^T * (AA^T)^(-1)
-        AT_AAT_inv = A.T @ AAT_inv  # n x m
-
-        # Convert matrices to C arrays
-        A_init = self._matrix_to_c_init(A)
-        b_init = self._vector_to_c_init(b.flatten())
-        AT_AAT_inv_init = self._matrix_to_c_init(AT_AAT_inv)
+        # Convert matrices to C++ Eigen initializers
+        A_init = self._matrix_to_eigen_init(A)
+        b_init = self._vector_to_eigen_init(b.flatten())
 
         code = f"""
-// Projection-based objective for linear equality constraints
-// Formula: g(z) = ||A^T(AA^T)^(-1)(Az - b)||^2
-// A is {m}x{n}, b is {m}x1
-// Only uses {n} variables that appear in linear constraints
+    #include <Eigen/Dense>
+    using namespace Eigen;
 
-static double compute_projection_objective({", ".join([f"double {var}" for var in linear_vars.keys()])}) {{
-    // Matrix A
-    static const double A[{m}][{n}] = {A_init};
+    // Projection-based objective for linear equality constraints
+    // Formula: g(z) = ||A^T(AA^T)^(-1)(Az - b)||^2
+    // A is {m}x{n}, b is {m}x1
+    // Uses Eigen for numerically stable computation
 
-    // Vector b
-    static const double b[{m}] = {b_init};
+    static double compute_projection_objective({", ".join([f"double {var}" for var in linear_vars.keys()])}) {{
+        // Initialize constraint matrix A ({m} x {n})
+        MatrixXd A({m}, {n});
+        A << {A_init};
 
-    // Precomputed A^T * (AA^T)^(-1), which is {n}x{m}
-    static const double AT_AAT_inv[{n}][{m}] = {AT_AAT_inv_init};
+        // Initialize constraint vector b ({m} x 1)
+        VectorXd b({m});
+        b << {b_init};
 
-    // Input vector z (only variables in linear constraints)
-    double z[{n}] = {{{", ".join([var for var in linear_vars.keys()])}}};
+        // Input vector z (only variables in linear constraints)
+        VectorXd z({n});
+        z << {", ".join([var for var in linear_vars.keys()])};
 
-    // Step 1: Compute residual r = Az - b
-    double residual[{m}];
-    for (int i = 0; i < {m}; i++) {{
-        residual[i] = -b[i];
-        for (int j = 0; j < {n}; j++) {{
-            residual[i] += A[i][j] * z[j];
-        }}
+        // Step 1: Compute residual r = Az - b
+        VectorXd residual = A * z - b;
+
+        // Step 2: Solve (AA^T)x = residual for x using numerically stable solver
+        // This is equivalent to x = (AA^T)^(-1) * residual
+        MatrixXd AAT = A * A.transpose();
+        VectorXd x = AAT.ldlt().solve(residual);
+
+        // Step 3: Compute projection vector = A^T * x
+        VectorXd proj_vec = A.transpose() * x;
+
+        // Step 4: Return squared norm (distance-to-feasible-set objective)
+        return proj_vec.squaredNorm();
     }}
-
-    // Step 2: Compute projection_vector = A^T * (AA^T)^(-1) * residual
-    // This is an {n}-dimensional vector
-    double proj_vec[{n}];
-    for (int i = 0; i < {n}; i++) {{
-        proj_vec[i] = 0.0;
-        for (int j = 0; j < {m}; j++) {{
-            proj_vec[i] += AT_AAT_inv[i][j] * residual[j];
-        }}
-    }}
-
-    // Step 3: Compute squared norm of projection_vector
-    // This is the distance-to-feasible-set objective
-    double obj = 0.0;
-    for (int i = 0; i < {n}; i++) {{
-        obj += proj_vec[i] * proj_vec[i];
-    }}
-
-    return obj;
-}}
-"""
+    """
         return code
 
-    def _matrix_to_c_init(self, matrix):
-        """Convert numpy matrix to C array initializer."""
+    def _matrix_to_eigen_init(self, matrix):
+        """Convert numpy matrix to Eigen comma initializer format."""
         rows, cols = matrix.shape
-        rows_str = []
+        all_vals = []
         for i in range(rows):
-            row_vals = ", ".join([f"{matrix[i, j]:.16e}" for j in range(cols)])
-            rows_str.append(f"{{{row_vals}}}")
-        return f"{{{', '.join(rows_str)}}}"
+            for j in range(cols):
+                all_vals.append(f"{matrix[i, j]:.16e}")
+        return ",\n        ".join(all_vals)
 
-    def _vector_to_c_init(self, vector):
-        """Convert numpy vector to C array initializer."""
-        vals_str = ", ".join([f"{val:.16e}" for val in vector])
-        return f"{{{vals_str}}}"
-
+    def _vector_to_eigen_init(self, vector):
+        """Convert numpy vector to Eigen comma initializer format."""
+        vals_str = ",\n        ".join([f"{val:.16e}" for val in vector])
+        return vals_str
 
 def print_xsat_info():
     """Print XSat banner information."""
