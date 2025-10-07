@@ -65,12 +65,16 @@ class CodeTemplate:
         return """#include <Python.h>
     #include "xsat.h"
     #include <math.h>
+    %(ulp_projection)s
     static PyObject* R(PyObject* self, PyObject *args){
 
       %(var_declarations)s
       if (!PyArg_ParseTuple(args,"%(parse_formats)s", %(var_refs)s))
         return NULL;
       %(x_body)s
+      
+      %(objective_computation)s
+      
       return Py_BuildValue("d",%(x_expr)s);
     }
 

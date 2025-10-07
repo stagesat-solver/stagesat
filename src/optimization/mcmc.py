@@ -98,8 +98,8 @@ def mcmc(args, i):
     for round_num in range(args.nStartOver):
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
-        sp = np.zeros(foo_square.dim) + args.startPoint + (i % 4) + np.random.uniform(-0.05, 0.05, foo_square.dim)
-        # sp = np.zeros(foo_square.dim) + np.random.uniform(-0.05, 0.05, foo_square.dim)
+        # sp = np.zeros(foo_square.dim) + args.startPoint + (i % 4) + np.random.uniform(-0.05, 0.05, foo_square.dim)
+        sp = np.zeros(foo_square.dim) + np.random.uniform(-0.05, 0.05, foo_square.dim)
         res = op.basinhopping(lambda X: R_quick(X, i, foo_square.R), sp, niter=args.niter, stepsize=args.stepSize,
                               minimizer_kwargs=_minimizer_kwargs)
         if args.showResult:

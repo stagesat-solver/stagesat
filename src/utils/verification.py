@@ -32,10 +32,6 @@ def _getSort(expr_z3):
 def var_hash(expr_z3):
     return "_x_" + str(expr_z3.hash())
 
-def var_name_from_id(expr_id):
-    """Generate variable name from expression ID."""
-    return "_t_" + str(expr_id)
-
 def _collect_vars(all_vars, expr):
     if z3.is_const(expr) and expr.decl().kind() == z3.Z3_OP_UNINTERPRETED:
         all_vars.add(expr)

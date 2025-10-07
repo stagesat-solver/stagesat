@@ -15,7 +15,7 @@ class ExpressionGenerator:
         self.cache = set()
         self.result = []
         # Hybrid approach attributes
-        self.linear_eq_constraints = []  # List of (id, lhs_expr, rhs_expr)
+        self.linear_eq_constraints = []  # List of (id, lhs_expr, rhs_expr, c_var_name)
         self.other_constraints = []  # List of (id, c_var_name)
         self.use_hybrid = True  # Flag to enable/disable hybrid approach
         self.inside_or = False
@@ -31,8 +31,6 @@ class ExpressionGenerator:
         self.other_constraints = []
         self.inside_or = False
         self.linearity_info = {}
-
-    # ============= Linearity Analysis Methods =============
 
     def is_linear(self, expr_z3, symbolTable=None, cache=None):
         """
@@ -130,6 +128,10 @@ class ExpressionGenerator:
             is_linear = self.is_linear(expr_z3.arg(0), symbolTable, cache)
             self.linearity_info[expr_id] = (is_linear, "fpNeg")
             return is_linear
+        if sort_z3 == z3.Z3_OP_FPA_TO_FP:
+            is_linear = self.is_linear(expr_z3.arg(1), symbolTable, cache)
+            self.linearity_info[expr_id] = (is_linear, "FPA_TO_FP")
+            return is_linear
         # Default: non-linear
         self.linearity_info[expr_id] = (False, f"UNKNOWN(kind={sort_z3})")
         return False
@@ -210,7 +212,6 @@ class ExpressionGenerator:
             return verification.var_name(expr_z3)
         self.cache.add(expr_z3.get_id())
         sort_z3 = expr_z3.decl().kind()
-
         # Handle different operation types
         handlers = {
             z3.Z3_OP_FPA_LE: self.handle_comparison,
@@ -240,8 +241,6 @@ class ExpressionGenerator:
             return self.handle_or(expr_z3)
         raise NotImplementedError(
             f"Not implemented case for expr_z3 = {expr_z3}, kind({expr_z3.decl().kind()})")
-
-    # ============= Expression Handler Methods =============
 
     def handle_variable(self, expr_z3):
         """Handle variable expressions."""
@@ -353,7 +352,7 @@ class ExpressionGenerator:
         self.linearity_info[expr_id] = (
             is_linear, f"CONSTRAINT_EQ(lhs={lhs_linear},rhs={rhs_linear})")
         if self.use_hybrid and is_linear and not self.inside_or:
-            self.linear_eq_constraints.append((expr_id, lhs_expr, rhs_expr))
+            self.linear_eq_constraints.append((expr_id, lhs_expr, rhs_expr, verification.var_name(expr_z3)))
             comment = " // LINEAR EQ - for projection objective"
         else:
             if self.inside_or:
