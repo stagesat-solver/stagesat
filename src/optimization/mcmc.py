@@ -98,8 +98,8 @@ def mcmc(args, i):
     for round_num in range(args.nStartOver):
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
-        # sp = np.zeros(foo_square.dim) + args.startPoint + (i % 4) + np.random.uniform(-0.05, 0.05, foo_square.dim)
-        sp = np.zeros(foo_square.dim) + np.random.uniform(-0.05, 0.05, foo_square.dim)
+        sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-5e-5, 5e-5, foo_square.dim)
+        # sp = np.zeros(foo_square.dim) + np.random.uniform(-0.05, 0.05, foo_square.dim)
         res = op.basinhopping(lambda X: R_quick(X, i, foo_square.R), sp, niter=args.niter, stepsize=args.stepSize,
                               minimizer_kwargs=_minimizer_kwargs)
         if args.showResult:
@@ -112,27 +112,27 @@ def mcmc(args, i):
         if res.fun >= args.round2_threshold:
             continue
         ########################################################################################
-        if args.showTime:
-            print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        sp2 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
-        res_round2 = op.basinhopping(
-            lambda X: foo_ulp.R(*scale(X, i)),
-            sp2,
-            niter=args.round2_niter,
-            stepsize=args.round2_stepsize,
-            minimizer_kwargs=_minimizer_kwargs,
-            callback=_callback_global
-        )
-        R_star = res_round2.fun
-        X_star = scale(tr_help(res_round2.x), i)
-        if R_star < best_R_star:
-            best_R_star = R_star
-            best_X_star = X_star
-            print(f"//////////////////////////////R2 found a best_R_star: {best_R_star} + R1: {res.fun}")
-        if best_R_star == 0:
-            break
-        if res_round2.fun >= args.round3_threshold:
-            continue
+        # if args.showTime:
+        #     print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # sp2 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
+        # res_round2 = op.basinhopping(
+        #     lambda X: foo_ulp.R(*scale(X, i)),
+        #     sp2,
+        #     niter=args.round2_niter,
+        #     stepsize=args.round2_stepsize,
+        #     minimizer_kwargs=_minimizer_kwargs,
+        #     callback=_callback_global
+        # )
+        # R_star = res_round2.fun
+        # X_star = scale(tr_help(res_round2.x), i)
+        # if R_star < best_R_star:
+        #     best_R_star = R_star
+        #     best_X_star = X_star
+        #     print(f"//////////////////////////////R2 found a best_R_star: {best_R_star} + R1: {res.fun}")
+        # if best_R_star == 0:
+        #     break
+        # if res_round2.fun >= args.round3_threshold:
+        #     continue
         ########################################################################################
         if args.showTime:
             print("[Xsat] round3_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")

@@ -51,6 +51,8 @@ class ExpressionGenerator:
         if cache is None:
             cache = self.cache
         expr_id = expr_z3.get_id()
+        if expr_id == 376:
+            a = 1
         if expr_id in self.linearity_info:
             return self.linearity_info[expr_id][0]
         # Variables are linear
@@ -341,6 +343,10 @@ class ExpressionGenerator:
         """Handle equality operations."""
         lhs_expr = expr_z3.arg(0)
         rhs_expr = expr_z3.arg(1)
+        if str(lhs_expr) == "b2181":
+            a = 1
+        if str(lhs_expr) == "b1922":
+            a = 1
         lhs = self._gen_recursive(lhs_expr)
         rhs = self._gen_recursive(rhs_expr)
         lhs_type = self.get_operand_type(lhs_expr, self.symbolTable, self.cache)

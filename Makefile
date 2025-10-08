@@ -45,17 +45,15 @@ build/foo.c: $(IN)  XSAT_IN.txt
 
 compile_square: build/R_square/foo_square.so
 build/R_square/foo_square.so: include/R_square/xsat.h $(IN)
-	@echo "[XSAT] .smt2 -> build/foo_square.cpp (square mode)"
+	@echo "[XSAT] .smt2 -> build/foo_square.c (square mode)"
 	@mkdir -p build
-	@python xsat_gen.py $(IN) --square > build/foo_square.cpp
+	@python xsat_gen.py $(IN) --square > build/foo_square.c
 	@echo [XSAT]Compiling the representing function as $@
 	@mkdir -p build/R_square
-	@clang++ -O3 -fPIC build/foo_square.cpp $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
-		-I/usr/include/eigen3 \
+	@clang -O3 -fPIC build/foo_square.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_square \
 		-DMODULE_NAME=\"foo_square\" \
-		-fbracket-depth=3000 \
-		-std=c++17
+		-fbracket-depth=3000
 
 compile_ulp: build/R_ulp/foo_ulp.so
 build/R_ulp/foo_ulp.so: include/R_ulp/xsat.h $(IN)

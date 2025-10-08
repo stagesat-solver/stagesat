@@ -3,14 +3,11 @@ class CodeTemplate:
 
     @staticmethod
     def get_template():
-        """Return the C++ code template for Python C extension module with hybrid objective."""
         return """#include <Python.h>
     #include "xsat.h"
     #include <math.h>
 
     %(matrix_functions)s
-
-    extern "C" {
 
     static PyObject* R(PyObject* self, PyObject *args){
 
@@ -56,7 +53,6 @@ class CodeTemplate:
       return module;
     }
 
-    }  // extern "C"
     """
 
     @staticmethod
@@ -66,15 +62,16 @@ class CodeTemplate:
     #include "xsat.h"
     #include <math.h>
     %(ulp_projection)s
+    %(ulp_f32_projection)s
     static PyObject* R(PyObject* self, PyObject *args){
 
       %(var_declarations)s
       if (!PyArg_ParseTuple(args,"%(parse_formats)s", %(var_refs)s))
         return NULL;
       %(x_body)s
-      
+
       %(objective_computation)s
-      
+
       return Py_BuildValue("d",%(x_expr)s);
     }
 
