@@ -38,7 +38,7 @@ double ulp(double x, double y) {
   if (!isfinite(x) || !isfinite(y)) return INFINITY;
   uint64_t a = ordered_bits(x), b = ordered_bits(y);
   uint64_t d = (a >= b) ? (a - b) : (b - a);
-   return (double) d;
+   return (double) d * d;
 }
 
 // ============= FLOAT32 SUPPORT =============
@@ -53,7 +53,7 @@ double ulp_f32(float x, float y) {
   if (!isfinite(x) || !isfinite(y)) return INFINITY;
   uint32_t a = ordered_bits_f32(x), b = ordered_bits_f32(y);
   uint32_t d = (a >= b) ? (a - b) : (b - a);
-  return (double) d;  // Return as double for consistency
+  return (double) d * d;  // Return as double for consistency
 }
 
 double DLE_f32(float x, float y) {

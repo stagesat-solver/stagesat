@@ -43,7 +43,7 @@ def create_typed_input(X, symbolTable):
 def get_parser():
     parser = argparse.ArgumentParser(prog='Xsat')
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 2.0.0')
-    parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=50)
+    parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=30)
     parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=3)
     parser.add_argument('--method', help='Local minimization procedure', default='powell',
                         choices=['powell', 'slsqp', 'cg', 'l-bfgs-b', 'cobyla', 'tnc', 'bfgs', 'nelder-mead',
@@ -53,10 +53,10 @@ def get_parser():
                         default=False)
     parser.add_argument('--showResult', help='show the basinhopping output (default:false)', action='store_true',
                         default=False)
-    parser.add_argument('--stepSize', help='parameter of basinhopping', type=float, default=1e-10)
-    parser.add_argument('--round2_stepsize', help='parameter of basinhopping', type=float, default=1)
+    parser.add_argument('--stepSize', help='parameter of basinhopping', type=float, default=1e-3)
+    parser.add_argument('--round2_stepsize', help='parameter of basinhopping', type=float, default=10.0)
     parser.add_argument('--verify', help='verify the model', action='store_true', default=False)
-    parser.add_argument('--verify2', help='verify the model (method 2)', action='store_true', default=False)
+    parser.add_argument('--verify2', help='verify the model (method 2)', action='store_true', default=True)
     parser.add_argument('--showModel', help='show the model as a var->value mapping', action='store_true',
                         default=False)
     parser.add_argument('--showSymbolTable', help='show the symbol table, var->type', action='store_true',
@@ -72,12 +72,12 @@ def get_parser():
 
     parser.add_argument('--startPoint', help='start point in a single dimension', action='store', type=float,
                         default=1.0)
-    parser.add_argument('--round2_threshold', help='threshold_low for round2', action='store', type=float, default=1e-10)
-    parser.add_argument('--round3_threshold', help='threshold  for round3', action='store', type=float, default=1e10)
+    parser.add_argument('--round2_threshold', help='threshold_low for round2', action='store', type=float, default=1e-11)
+    parser.add_argument('--round3_threshold', help='threshold  for round3', action='store', type=float, default=1e6)
     parser.add_argument("--multi", help="multi-processing (default: true)", default=True, action='store', type=str2bool)
     # parser.add_argument("--single", help="single processor  (default: true)",default=True,action='store')
     # parser.add_argument("--round2", help="activate round2 when unsat (default: false)",default=False,action='store_true')
-    parser.add_argument("--round2_niter", help="niter for round2", action='store', type=int, required=False, default=50)
+    parser.add_argument("--round2_niter", help="niter for round2", action='store', type=int, required=False, default=10)
     parser.add_argument("--round3_niter", help="niter for round3", action='store', type=int, required=False, default=10)
     parser.add_argument("--round3_stepsize", help="stepsize for round3", action='store', type=float, required=False,
                         default=10.0)
@@ -228,19 +228,19 @@ def main():
             sys.stderr.write("WARNING!!!!!!!!!!!!!!!  Wrong model !\n")
         else:
             pass
-    # if args.verify2:
-    #     if args.showTime:
-    #         print("[Xsat] verify X_star with build/R_verify")
-    #     sys.path.insert(0, os.path.join(os.getcwd(), "build/R_verify"))
-    #     import foo as foo_verify
-    #     importlib.reload(foo_verify)  # necessary because name 'foo' now still points to foo_square
-    #     verify_res = foo_verify.R(*X_star) if foo_verify.dim == 1 else foo_verify.R(*(X_star))
-    #     if verify_res == 0 and R_star != 0:
-    #         sys.stderr.write("WARNING from verify2 (using include/R_verify/xsat.h) !!!!!!!!!!!!!!!! Actually sat.\n")
-    #     elif verify_res != 0 and R_star == 0:
-    #         sys.stderr.write("WARNING from verify2  (using include/R_verify/xsat.h) !!!!!!!!!!!!!!!  Wrong model ! \n")
-    #     else:
-    #         pass
+    if args.verify2:
+        if args.showTime:
+            print("[Xsat] verify X_star with build/R_verify")
+        sys.path.insert(0, os.path.join(os.getcwd(), "build/R_verify"))
+        import foo_verify
+        importlib.reload(foo_verify)
+        verify_res = foo_verify.R(*X_star) if foo_verify.dim == 1 else foo_verify.R(*(X_star))
+        if verify_res == 0 and R_star != 0:
+            sys.stderr.write("WARNING from verify2 (using include/R_verify/xsat.h) !!!!!!!!!!!!!!!! Actually sat.\n")
+        elif verify_res != 0 and R_star == 0:
+            sys.stderr.write("WARNING from verify2  (using include/R_verify/xsat.h) !!!!!!!!!!!!!!!  Wrong model ! \n")
+        else:
+            pass
     t_verify = time.time()
     if args.showSymbolTable:
         print(symbolTable)

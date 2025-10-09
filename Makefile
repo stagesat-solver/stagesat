@@ -67,7 +67,19 @@ build/R_ulp/foo_ulp.so: include/R_ulp/xsat.h $(IN)
 		-DMODULE_NAME=\"foo_ulp\" \
 		-fbracket-depth=3000
 
-compile: compile_square compile_ulp
+compile_verify: build/R_verify/foo_verify.so
+build/R_verify/foo_verify.so: include/R_verify/xsat.h $(IN)
+	@echo "[XSAT] .smt2 -> build/foo_verify.c (verify mode)"
+	@mkdir -p build
+	@python xsat_gen.py $(IN) --verify > build/foo_verify.c
+	@echo [XSAT]Compiling the representing function as $@
+	@mkdir -p build/R_verify
+	@clang -O3 -fPIC build/foo_verify.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_verify $(PYTHONLIB) \
+		-DPyInit_foo=PyInit_foo_verify \
+		-DMODULE_NAME=\"foo_verify\" \
+		-fbracket-depth=3000
+
+compile: compile_square compile_ulp compile_verify
 
 solve: compile
 	@echo [XSAT] Executing the solver.

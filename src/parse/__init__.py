@@ -3,7 +3,8 @@ from .LinearULPTransform import LinearULPTransform
 from .LinearSquareTransform import LinearSquareTransform
 from .LinearConstraintExtractor import LinearConstraintExtractor
 from .ExpressionGenerator import ExpressionGenerator
+from .VerifyGenerator import VerifyGenerator
 from .CodeTemplate import CodeTemplate
 
 __all__ = ['LinearTransform', 'LinearULPTransform', 'LinearSquareTransform',
-           'LinearConstraintExtractor', 'ExpressionGenerator', 'CodeTemplate']
+           'LinearConstraintExtractor', 'ExpressionGenerator', 'CodeTemplate', 'VerifyGenerator']

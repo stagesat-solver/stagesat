@@ -5,7 +5,7 @@ import warnings
 import pickle
 import src.utils.verification as verification
 from src.utils.sort import Sort
-from src.parse import LinearConstraintExtractor, ExpressionGenerator, CodeTemplate, LinearULPTransform, LinearSquareTransform
+from src.parse import LinearConstraintExtractor, ExpressionGenerator, CodeTemplate, LinearULPTransform, LinearSquareTransform, VerifyGenerator
 
 DEBUG = False
 
@@ -17,6 +17,7 @@ class CodeGenerator:
         self.expr_generator = ExpressionGenerator()
         self.template = CodeTemplate()
         self.ulp_transform = LinearULPTransform()
+        self.verify = VerifyGenerator()
 
     def generate_square(self, expr_z3):
         """Generate C code from Z3 expression with static matrix generation."""
@@ -95,7 +96,7 @@ class CodeGenerator:
         extractor = LinearConstraintExtractor(symbolTable)
         linear_eq_constraints = []
         other_constraint_vars = []
-        d_code, f_code = self.ulp_transform.ulp_projection_objective(self.expr_generator.linear_eq_constraints)
+        d_code, f_code = self.ulp_transform.build_objective(self.expr_generator.linear_eq_constraints)
         for constraint in self.expr_generator.linear_eq_constraints:
             constraint_id, lhs_expr, rhs_expr, var_name = constraint
             # Check if both sides are linear
@@ -174,7 +175,6 @@ def print_xsat_info():
     print("Contributors: Zhoulai Fu and Zhendong Su")
     print("*" * 50)
 
-
 def get_parser():
     """Create and return argument parser."""
     parser = argparse.ArgumentParser(prog='XSat', allow_abbrev=False)
@@ -201,8 +201,8 @@ def get_parser():
                         default=False, action='store_true')
     parser.add_argument('--square', action='store_true')
     parser.add_argument('--ulp', action='store_true')
+    parser.add_argument('--verify', action='store_true')
     return parser
-
 
 if __name__ == "__main__":
     parser = get_parser()
@@ -226,8 +226,10 @@ if __name__ == "__main__":
         symbolTable, foo_dot_c = generator.generate_square(expr_z3)
     elif args.ulp:
         symbolTable, foo_dot_c = generator.generate_ulp(expr_z3)
+    elif args.verify:
+        symbolTable, foo_dot_c = generator.verify.gen(expr_z3)
     else:
-        print("Error: Must specify either --square or --ulp", file=sys.stderr)
+        print("Error: Must specify either --square or --ulp or --verify", file=sys.stderr)
         sys.exit(1)
     args.smt2_file.close()
     os.makedirs("build", exist_ok=True)
