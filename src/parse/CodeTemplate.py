@@ -107,3 +107,47 @@ class CodeTemplate:
       return module;
     }
     """
+
+    @staticmethod
+    def get_empty_template():
+        template = """#include <Python.h>
+    #include "xsat.h"
+    #include <math.h>
+
+    static PyObject* R(PyObject* self, PyObject *args){
+      return PyFloat_FromDouble(0.0);  // Fixed: Must return PyObject*, not double
+    }
+
+    static PyMethodDef methods[] = {
+      {"R", R, METH_VARARGS, NULL},
+      {NULL, NULL, 0, NULL}
+    };
+
+    static struct PyModuleDef moduledef = {
+      PyModuleDef_HEAD_INIT,
+      #ifdef MODULE_NAME
+        MODULE_NAME,
+      #else
+        "foo",
+      #endif
+      NULL,            /* m_doc */
+      -1,              /* m_size */
+      methods,         /* m_methods */
+      NULL,            /* m_reload */
+      NULL,            /* m_traverse */
+      NULL,            /* m_clear */
+      NULL,            /* m_free */
+    };
+
+    PyMODINIT_FUNC
+    PyInit_foo(void)
+    {
+      PyObject* module = PyModule_Create(&moduledef);
+      if (module == NULL)
+        return NULL;
+
+      PyModule_AddIntConstant(module, "dim", 0);  // Fixed: Use actual value instead of placeholder
+      return module;
+    }
+    """
+        return template

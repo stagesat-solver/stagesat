@@ -16,7 +16,6 @@ import threading
 
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
-from src.core.config import SolverConfig
 from src.utils.sort import Sort
 import src.optimization.mcmc as op_mcmc
 import src.utils.verification as verification
@@ -60,7 +59,7 @@ def get_parser():
     parser.add_argument('--showModel', help='show the model as a var->value mapping', action='store_true',
                         default=False)
     parser.add_argument('--showSymbolTable', help='show the symbol table, var->type', action='store_true',
-                        default=True)
+                        default=False)
     parser.add_argument('--showConstraint', help='show the constraint, using the Z3 frontend', action='store_true',
                         default=False)
     parser.add_argument('--showVariableNumber', help='show variable number, using the Z3 frontend', action='store_true',
@@ -91,11 +90,6 @@ def get_parser():
     return parser
 
 def configure(args):
-    config = SolverConfig()
-    config.niter = args.niter
-    config.method = args.method
-    config.step_size = args.stepSize
-    config.multi_process = args.multi
     if args.bench:
         args.debug = False
         args.verify = False
@@ -110,12 +104,12 @@ def configure(args):
         args.showResult = True
         args.showTime = True
         args.suppressWarning = False
-    return config
+    return
 
 def main():
     parser = get_parser()
     args = parser.parse_args()
-    config = configure(args)
+    configure(args)
     if args.suppressWarning:
         warnings.filterwarnings("ignore")
     t_start = time.time()
@@ -142,81 +136,46 @@ def main():
             np.save(_f, f32_mask)
     except Exception as _e:
         print("[Xsat] Warning: failed to persist f32 mask:", _e)
-    if not args.multi:
-        # round1
-        t_round1_start = time.time()
-        (X_star, R_star) = op_mcmc.mcmc_round1(args)
-        t_round1_end = time.time()
-        satisfiable_round1 = verification.verify_solution(expr_z3, X_star, symbolTable, printModel=args.printModel)
-        if satisfiable_round1 and R_star != 0:
-            sys.stderr.write("WARNING!!!!!!!!!!!!!!!! Actually sat.\n")
-        elif not satisfiable_round1 and R_star == 0:
-            sys.stderr.write("WARNING!!!!!!!!!!!!!!!  Wrong model Maybe unsat!\n")
-        else:
-            pass
-
-        # round2
-        t_round2_start = time.time()
-        if not satisfiable_round1:
-            X_star, R_star = op_mcmc.mcmc_round2(args, X_star)
-        t_round2_end = time.time()
-
-        # round3
-        t_round3_start = time.time()
-        if R_star > 0 and R_star < args.round3_threshold:
-            (X_star, R_star) = op_mcmc.mcmc_round3(args, X_star)
-        t_round3_end = time.time()
-
-        # print out results (optional part)
-        if args.showResult:
-            print("X_star (final)", X_star)
-            print("R_star (final)", R_star)
-        # print out results (mandatory part)
-        if R_star == 0:
-            print('sat')
-        else:
-            print('unsat')
-        # verification part is shown at the end of this file.
-    else:
+    if args.showTime:
+        print("[Xsat] ENTERING: main_multi")
+    results_pool = []
+    result_lock = threading.Lock()
+    pool = mp.Pool()
+    # execute it quickly, since a lock is set
+    def log_result(result):
+        X_star, R_star = result
         if args.showTime:
-            print("[Xsat] ENTERING: main_multi")
-        results_pool = []
-        result_lock = threading.Lock()
-        pool = mp.Pool()
-        # execute it quickly, since a lock is set
-        def log_result(result):
-            X_star, R_star = result
-            if args.showTime:
-                print(f"[Xsat-multi] ENTERING: {mp.current_process().name} , log_result Minimum =, {R_star}")
-            # assert len(results_pool) <= 1
-            with result_lock:
-                if len(results_pool) == 0:
-                    results_pool.append(result)
-                else:
-                    X_star_pool, R_star_pool = results_pool[0]
-                    if R_star < R_star_pool:
-                        results_pool[0] = result
-                        if R_star_pool == 0:
-                            if args.showTime:
-                                print("[Xsat-multi] I kill the other process now!!!")
-                            pool.terminate()
-        for i in range(mp.cpu_count()):
-            p = pool.apply_async(op_mcmc.mcmc, args=(args, i,), callback=log_result)
-        pool.close()
-        pool.join()
-        assert len(results_pool) == 1
-        (X_star, R_star) = results_pool[0]
-        if X_star.ndim == 0: X_star = np.array([X_star[()]])
-        if R_star == 0:
-            print('sat')
-        else:
-            print('unsat')
-        has_float32 = any(t == Sort.Float32 for t in symbolTable.values())
-        if has_float32:
-            X_star = np.array(create_typed_input(X_star, symbolTable))
-        if args.showResult:
-            print(f"X_star (final) {X_star}")
-            print(f"R_star (final) {R_star}")
+            print(f"[Xsat-multi] ENTERING: {mp.current_process().name} , log_result Minimum =, {R_star}")
+        # assert len(results_pool) <= 1
+        with result_lock:
+            if len(results_pool) == 0:
+                results_pool.append(result)
+            else:
+                X_star_pool, R_star_pool = results_pool[0]
+                if R_star < R_star_pool:
+                    results_pool[0] = result
+                    if R_star_pool == 0:
+                        if args.showTime:
+                            print("[Xsat-multi] I kill the other process now!!!")
+                        pool.terminate()
+
+    for i in range(mp.cpu_count()):
+        p = pool.apply_async(op_mcmc.mcmc, args=(args, i,), callback=log_result)
+    pool.close()
+    pool.join()
+    assert len(results_pool) == 1
+    (X_star, R_star) = results_pool[0]
+    if X_star.ndim == 0: X_star = np.array([X_star[()]])
+    if R_star == 0:
+        print('sat')
+    else:
+        print('unsat')
+    has_float32 = any(t == Sort.Float32 for t in symbolTable.values())
+    if has_float32:
+        X_star = np.array(create_typed_input(X_star, symbolTable))
+    if args.showResult:
+        print(f"X_star (final) {X_star}")
+        print(f"R_star (final) {R_star}")
     t_mcmc = time.time()
     if args.verify:
         if args.showTime:
@@ -252,11 +211,6 @@ def main():
         print("[Xsat] Time elapsed:")
         #        print "  parse_and_compile    : %g seconds " % (t_parse_and_compile-t_start)
         print("  solve (all)  : %g seconds" % (t_mcmc - t_start))
-        if not args.multi:
-            print("        round1  : %g seconds" % (t_round1_end - t_round1_start))
-            print("        round2  : %g seconds" % (t_round2_end - t_round2_start))
-            print("        round3  : %g seconds" % (t_round3_end - t_round3_start))
-            print("        verification after round1 also takes a little time")
         print("  verify : %g seconds" % (t_verify - t_mcmc))
         print("\n  Total        : %g seconds" % (t_verify - t_start))
 

@@ -3,6 +3,7 @@ import sys
 import struct
 import importlib
 import warnings
+import random
 import numpy as np
 import scipy.optimize as op
 import multiprocessing as mp
@@ -98,7 +99,8 @@ def mcmc(args, i):
     for round_num in range(args.nStartOver):
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
-        sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-5e-50, 5e-50, foo_square.dim)
+        noise_range = 0.5 if random.random() < 0.2 else 5e-50
+        sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
         res = op.basinhopping(lambda X: R_quick(X, i, foo_square.R), sp, niter=args.niter, stepsize=args.stepSize,
                               minimizer_kwargs=_minimizer_kwargs)
         if args.showResult:

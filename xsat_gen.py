@@ -26,7 +26,7 @@ class CodeGenerator:
         main_expr = self.expr_generator.generate(expr_z3)
         symbolTable = self.expr_generator.symbolTable
         if len(self.expr_generator.symbolTable) == 0:
-            return self.expr_generator.symbolTable, 'int main(){return 0;}'
+            return self.expr_generator.symbolTable, self.template.get_empty_template()
         # Separate linear equality constraints from other constraints
         linear_eq_constraints = []
         other_constraint_vars = []
@@ -92,7 +92,7 @@ class CodeGenerator:
         main_expr = self.expr_generator.generate(expr_z3)
         symbolTable = self.expr_generator.symbolTable
         if len(self.expr_generator.symbolTable) == 0:
-            return self.expr_generator.symbolTable, 'int main(){return 0;}'
+            return self.expr_generator.symbolTable, self.template.get_empty_template()
         extractor = LinearConstraintExtractor(symbolTable)
         linear_eq_constraints = []
         other_constraint_vars = []
