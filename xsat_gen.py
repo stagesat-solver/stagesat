@@ -5,7 +5,7 @@ import warnings
 import pickle
 import src.utils.verification as verification
 from src.utils.sort import Sort
-from src.parse import LinearConstraintExtractor, ExpressionGenerator, CodeTemplate, LinearULPTransform, LinearSquareTransform, VerifyGenerator
+from src.parse import ExpressionGenerator, CodeTemplate, LinearULPTransform, LinearSquareTransform, VerifyGenerator
 
 DEBUG = False
 
@@ -93,7 +93,6 @@ class CodeGenerator:
         symbolTable = self.expr_generator.symbolTable
         if len(self.expr_generator.symbolTable) == 0:
             return self.expr_generator.symbolTable, self.template.get_empty_template()
-        extractor = LinearConstraintExtractor(symbolTable)
         linear_eq_constraints = []
         other_constraint_vars = []
         d_code, f_code = self.ulp_transform.build_objective(self.expr_generator.linear_eq_constraints)

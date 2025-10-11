@@ -18,21 +18,22 @@ sys.path.insert(0, os.path.join(os.getcwd(), "build/R_square"))
 import foo_square
 importlib.reload(foo_square)
 
-foundit = mp.Event()
-def _callback_global(x, f, accepted):
-    if f == 0 or foundit.is_set():
-        foundit.set()
-        return True
+class BasinHoppingCallback:
+    def __init__(self, stop_event):
+        self.stop_event = stop_event
 
-#to handle an issue due to 'powell': it returns a zero-dimensional array even if the starting point is of one dimension.
+    def __call__(self, x, f, accepted):
+        if self.stop_event.is_set():
+            return True  # Stop the optimization
+        if f == 0:
+            return True  # Also a stop condition
+        return False
+
 def tr_help(X):
-        if X.ndim == 0: return np.array([X])
-        else: return X
-
-def scales():
-    return [(lambda x: x ** 11, lambda x: np.sign(x) * np.abs(x) ** (1.0/11)),
-            (lambda x: x ** 17, lambda x: np.sign(x) * np.abs(x) ** (1.0/17)),
-            (lambda x: x ** 25, lambda x: np.sign(x) * np.abs(x) ** (1.0/25))]
+    if X.ndim == 0:
+        return np.array([X])
+    else:
+        return X
 
 def noop_min(fun, x0, args, **options):
     return op.OptimizeResult(x=x0, fun=fun(x0), success=True, nfev=1)
@@ -40,8 +41,8 @@ def noop_min(fun, x0, args, **options):
 def scale(X, i):
     return X ** (i + 1)
 
-def R_quick(X,i,f):
-    return f(* scale(X,i))
+def R_quick(X, i, f):
+    return f(*scale(X, i))
 
 def mcmc_bis(i):
     print("*******value of i = ", i)
@@ -85,7 +86,7 @@ def nth_fp32_vectorized(n, x):
     bit_pattern = struct.pack('I', m | sign_bit)
     return struct.unpack('f', bit_pattern)[0]
 
-def mcmc(args, i):
+def mcmc(args, i, stop_event):
     with open("build/f32_mask.npy", "rb") as f:
         f32_mask = np.load(f)
     f32_indices = np.where(f32_mask)[0]
@@ -96,13 +97,16 @@ def mcmc(args, i):
     ]
     best_X_star = np.zeros(foo_square.dim)
     best_R_star = float('inf')
+    callback = BasinHoppingCallback(stop_event)
     for round_num in range(args.nStartOver):
+        if stop_event.is_set():
+            break
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
         noise_range = 0.5 if random.random() < 0.2 else 5e-50
         sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
         res = op.basinhopping(lambda X: R_quick(X, i, foo_square.R), sp, niter=args.niter, stepsize=args.stepSize,
-                              minimizer_kwargs=_minimizer_kwargs)
+                              minimizer_kwargs=_minimizer_kwargs, callback=callback)
         if args.showResult:
             print("result (round 1) with i = ", i, ":")
             # print(f"{res.fun} + {scale(res.x, i)}")
@@ -110,6 +114,8 @@ def mcmc(args, i):
             print()
         X_star = scale(res.x, i)
         R_star = res.fun
+        if stop_event.is_set():
+            break
         if res.fun >= args.round2_threshold:
             continue
         ########################################################################################
@@ -124,7 +130,7 @@ def mcmc(args, i):
             return foo_ulp.R(*X2_moved)
         res_round2 = op.basinhopping(obj_near2, np.zeros(foo_ulp.dim), niter=args.round2_niter,
                                      stepsize=args.round2_stepsize, minimizer_kwargs=_minimizer_kwargs,
-                                     callback=_callback_global)
+                                     callback=callback)
         R_star = res_round2.fun
         X_star = np.array([
             nth_fp_dispatchers[j](n_val, x_base_val)

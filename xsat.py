@@ -39,6 +39,11 @@ def create_typed_input(X, symbolTable):
             typed_X.append(np.float64(X[idx]))
     return typed_X
 
+def worker_process(args, worker_id, queue, stop_event):
+    """The function that each worker process will execute."""
+    result = op_mcmc.mcmc(args, worker_id, stop_event)
+    queue.put(result)
+
 def get_parser():
     parser = argparse.ArgumentParser(prog='Xsat')
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 2.0.0')
@@ -138,33 +143,32 @@ def main():
         print("[Xsat] Warning: failed to persist f32 mask:", _e)
     if args.showTime:
         print("[Xsat] ENTERING: main_multi")
-    results_pool = []
-    result_lock = threading.Lock()
-    pool = mp.Pool()
-    # execute it quickly, since a lock is set
-    def log_result(result):
-        X_star, R_star = result
-        if args.showTime:
-            print(f"[Xsat-multi] ENTERING: {mp.current_process().name} , log_result Minimum =, {R_star}")
-        # assert len(results_pool) <= 1
-        with result_lock:
-            if len(results_pool) == 0:
-                results_pool.append(result)
-            else:
-                X_star_pool, R_star_pool = results_pool[0]
-                if R_star < R_star_pool:
-                    results_pool[0] = result
-                    if R_star_pool == 0:
-                        if args.showTime:
-                            print("[Xsat-multi] I kill the other process now!!!")
-                        pool.terminate()
-
-    for i in range(mp.cpu_count()):
-        p = pool.apply_async(op_mcmc.mcmc, args=(args, i,), callback=log_result)
-    pool.close()
-    pool.join()
-    assert len(results_pool) == 1
-    (X_star, R_star) = results_pool[0]
+    results_queue = mp.Queue()
+    stop_event = mp.Event()
+    processes = [mp.Process(target=worker_process, args=(args, i, results_queue, stop_event))
+                 for i in range(mp.cpu_count())]
+    for p in processes:
+        p.start()
+    X_star = None
+    R_star = float('inf')
+    num_workers_finished = 0
+    try:
+        while num_workers_finished < len(processes):
+            X, R = results_queue.get()
+            num_workers_finished += 1
+            if R <= R_star:
+                R_star = R
+                X_star = X
+            if R_star == 0:
+                if args.showTime:
+                    print("[Xsat Host] Optimal solution found. Terminating workers.")
+                stop_event.set()
+                break
+    finally:
+        for p in processes:
+            if p.is_alive():
+                p.terminate()
+            p.join()
     if X_star.ndim == 0: X_star = np.array([X_star[()]])
     if R_star == 0:
         print('sat')
