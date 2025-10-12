@@ -81,7 +81,13 @@ class LinearTransform:
         num = ' '.join(terms).lstrip('+ ').replace('+ -', '- ')
         if not num: num = "0"
         try:
-            ret = num if den == 1 else float(num) / den
+            if den == 1:
+                if not any(v in num for v in var_order):
+                    ret = float(eval(num))
+                else:
+                    ret = num
+            else:
+                ret = float(num) / den
         except:
             ret = num if den == 1 else f"({num})/{den}"
         return ret

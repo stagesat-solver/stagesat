@@ -191,7 +191,7 @@ class VerifyGenerator():
                 print("-- Branch _is_fpFP")
             assert expr_z3.num_args() == 2
             if not (z3_util.is_RNE(expr_z3.arg(0))):
-                warnings.warn("WARNING!!! I expect the first argument of fpFP is RNE, but it is ", expr_z3.arg(0))
+                warnings.warn(f"WARNING!!! I expect the first argument of fpFP is RNE, but it is {expr_z3.arg(0)}")
             x = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             if expr_z3.sort() == z3.FPSort(8, 24):
                 toAppend = "float %s = (float)(%s);" % (verification.var_name(expr_z3), x)
@@ -230,7 +230,7 @@ class VerifyGenerator():
             if DEBUG:
                 print("-- Branch _is_fpMul")
             if not z3_util.is_RNE(expr_z3.arg(0)):
-                warnings.warn("WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = ", expr_z3.arg(0))
+                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
             assert expr_z3.num_args() == 3
             lhs = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             rhs = self._gen(expr_z3.arg(2), symbolTable, cache, result)
@@ -245,7 +245,7 @@ class VerifyGenerator():
             if DEBUG:
                 print("-- Branch _is_fpDiv")
             if not z3_util.is_RNE(expr_z3.arg(0)):
-                warnings.warn("WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = ", expr_z3.arg(0))
+                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
             assert expr_z3.num_args() == 3
             lhs = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             rhs = self._gen(expr_z3.arg(2), symbolTable, cache, result)
@@ -260,7 +260,7 @@ class VerifyGenerator():
             if DEBUG:
                 print("-- Branch _is_fpAdd")
             if not z3_util.is_RNE(expr_z3.arg(0)):
-                warnings.warn("WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = ", expr_z3.arg(0))
+                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
             assert expr_z3.num_args() == 3
             lhs = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             rhs = self._gen(expr_z3.arg(2), symbolTable, cache, result)
@@ -289,7 +289,7 @@ class VerifyGenerator():
                 print("-- Branch _is_not")
             assert expr_z3.num_args() == 1
             if not (expr_z3.arg(0).num_args() == 2):
-                warnings.warn("WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = ", expr_z3.arg(0))
+                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
             op1 = self._gen(expr_z3.arg(0).arg(0), symbolTable, cache, result)
             op2 = self._gen(expr_z3.arg(0).arg(1), symbolTable, cache, result)
             lhs_type = self._get_operand_type(expr_z3.arg(0).arg(0), symbolTable, cache)
