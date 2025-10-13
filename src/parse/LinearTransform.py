@@ -67,9 +67,36 @@ class LinearTransform:
 
     @staticmethod
     def linear_expr_to_str(row, const, var_order):
+        MAX_SAFE_INT = 10**15
         den = reduce(LinearTransform._lcm, [x.denominator for x in row + [const]], 1)
         ints = [int(x * den) for x in row]
         c0 = int(const * den)
+        # Check if any integer is too large for C
+        max_int = max([abs(i) for i in ints] + [abs(c0), den])
+        if max_int > MAX_SAFE_INT:
+            # Fall back to floating-point representation
+            terms = []
+            for coef, v in zip(row, var_order):
+                if coef == 0: continue
+                coef_float = float(coef)
+                if abs(coef_float) == 1.0:
+                    sgn = '-' if coef_float < 0 else '+'
+                    terms.append(f"{sgn} {v}" if coef_float > 0 else f"- {v}")
+                else:
+                    if coef_float < 0:
+                        terms.append(f"- {abs(coef_float):.17g}*{v}")
+                    else:
+                        terms.append(f"+ {coef_float:.17g}*{v}")
+            if const != 0:
+                const_float = float(const)
+                if const_float < 0:
+                    terms.append(f"- {abs(const_float):.17g}")
+                else:
+                    terms.append(f"+ {const_float:.17g}")
+            ret = ' '.join(terms).lstrip('+ ').replace('+ -', '- ')
+            if not ret: ret = "0.0"
+            return ret
+        # Original logic for small integers
         terms = []
         for coef, v in zip(ints, var_order):
             if coef == 0: continue
