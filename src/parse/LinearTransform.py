@@ -6,6 +6,7 @@ from functools import reduce
 from fractions import Fraction
 from z3 import FPRef, is_fp_value, is_const, simplify
 import src.utils.z3_util as z3_util
+import src.utils.verification as verification
 
 class LinearTransform:
     def __init__(self):
@@ -148,7 +149,7 @@ class LinearTransform:
                     self.has_float = True
                 if e.sort() == z3.FPSort(11, 53):
                     self.has_double = True
-                var_name = str(e)
+                var_name = verification.rename_var(e.decl().name())
                 var_coefs[var_name] = var_coefs.get(var_name, Fraction(0)) + sign
                 return
             decl = e.decl()

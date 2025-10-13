@@ -11,7 +11,7 @@ def replace_all(text, dic):
     return text
 
 def rename_var(var):
-    reps = {':':'_', '@':'_', '|':'_', "#":'_', "!":"_"}
+    reps = {':':'_', '@':'_', '|':'_', "#":'_', "!":"_", "~":"_", "-":"_", " ":"_"}
     return replace_all(var, reps)
 
 def var_name(expr_z3):
