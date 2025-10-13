@@ -3,6 +3,7 @@ from typing import List
 from z3 import FPRef
 from src.parse.LinearTransform import LinearTransform
 
+
 class LinearSquareTransform(LinearTransform):
     def __init__(self):
         super().__init__()
@@ -15,7 +16,7 @@ class LinearSquareTransform(LinearTransform):
 
     def handle_constraint(self, lhs: FPRef, rhs: FPRef):
         lhs_c, lhs_k = self._parse_z3_linear_expr(lhs)
-        rhs_c, rhs_k= self._parse_z3_linear_expr(rhs)
+        rhs_c, rhs_k = self._parse_z3_linear_expr(rhs)
         # get variables from lhs_c and rhs_c
         for k in lhs_c.keys():
             self.var.add(k)
@@ -44,15 +45,22 @@ class LinearSquareTransform(LinearTransform):
         A, b = self.build_A_b(constraints)
         if not A:
             return ""
-        AT = LinearTransform._mat_transpose(A)
-        AAT = LinearTransform._mat_mul(A, AT)
-        AAT_inv = LinearTransform._mat_inv(AAT)
-        P = LinearTransform._mat_mul(AT, AAT_inv)
-        PA = LinearTransform._mat_mul(P, A)
-        I = LinearTransform._mat_eye(len(self.var))
-        M = LinearTransform._mat_add(I, PA, sign=-1)
-        c = LinearTransform._mat_vec(P, b)
-        return self._gen_matrix_code(M, c)
+        try:
+            AT = LinearTransform._mat_transpose(A)
+            AAT = LinearTransform._mat_mul(A, AT)
+            AAT_inv = LinearTransform._mat_inv(AAT)
+            P = LinearTransform._mat_mul(AT, AAT_inv)
+            PA = LinearTransform._mat_mul(P, A)
+            I = LinearTransform._mat_eye(len(self.var))
+            M = LinearTransform._mat_add(I, PA, sign=-1)
+            c = LinearTransform._mat_vec(P, b)
+            return self._gen_matrix_code(M, c)
+        except ValueError as e:
+            # Matrix is singular (redundant or over-determined constraints)
+            # Fall back to direct constraint evaluation without projection
+            import warnings
+            warnings.warn(f"Singular matrix detected: {e}. Using direct constraint evaluation instead of projection.")
+            return ""
 
     def _gen_matrix_code(self, M, c):
         var_lis = sorted(self.var)
@@ -68,4 +76,3 @@ class LinearSquareTransform(LinearTransform):
     }}
         """
         return code
-

@@ -42,7 +42,8 @@ class CodeGenerator:
             other_constraint_vars.append(var_name)
         square_code = self.square_transform.square_projection_objective(linear_eq_constraints)
         objective_computation = ""
-        if linear_eq_constraints:
+        # Only use projection if we successfully generated the matrix code (non-singular)
+        if linear_eq_constraints and square_code:
             # Combine both objectives
             other_obj = " + ".join(other_constraint_vars) if other_constraint_vars else "0.0"
             # Only pass variables that appear in linear constraints
@@ -70,7 +71,7 @@ class CodeGenerator:
                 raise NotImplementedError("Unknown types in SMT")
         x_body = '\n  '.join(self.expr_generator.result)
         x_dim = len(symbolTable)
-        x_expr = "final_objective" if linear_eq_constraints else verification.var_name(expr_z3)
+        x_expr = "final_objective" if (linear_eq_constraints and square_code) else verification.var_name(expr_z3)
         code = self.template.get_template() % {
             "matrix_functions": square_code,
             "var_declarations": "\n  ".join(var_declarations),

@@ -93,8 +93,8 @@ class LinearTransform:
         return ret
 
     def _is_variable(self, expr):
-        """Check if expression is a variable (constant symbol, not a value)"""
-        return is_const(expr) and not is_fp_value(expr)
+        """Check if expression is a variable (constant symbol, not a value and not a rounding mode)"""
+        return is_const(expr) and not is_fp_value(expr) and not z3_util.is_rounding_mode(expr)
 
     def _extract_constant(self, expr_z3):
         """Extract numeric value from Z3 expression as Fraction"""
@@ -138,6 +138,8 @@ class LinearTransform:
         constant = Fraction(0)
         def traverse(e, sign):
             nonlocal var_coefs, constant
+            if z3_util.is_rounding_mode(e):
+                return
             if is_fp_value(e):
                 constant += sign * Fraction(Decimal(str(self._extract_constant(e))))
                 return
@@ -151,7 +153,7 @@ class LinearTransform:
                 return
             decl = e.decl()
             op_name = decl.name()
-            children = [c for c in e.children() if not z3_util.is_RNE(c)]
+            children = [c for c in e.children() if not z3_util.is_rounding_mode(c)]
             if op_name in ['fp.add', '+']:
                 # Addition: traverse all operands
                 for child in children:
@@ -180,4 +182,3 @@ class LinearTransform:
                 raise ValueError(f"Unsupported operation '{op_name}' in linear expression: {e}")
         traverse(expr, Fraction(1))
         return var_coefs, constant
-
