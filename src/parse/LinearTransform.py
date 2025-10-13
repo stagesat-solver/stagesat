@@ -87,7 +87,7 @@ class LinearTransform:
                 else:
                     ret = num
             else:
-                ret = float(num) / den
+                ret = float(eval(num)) / den
         except:
             ret = num if den == 1 else f"({num})/{den}"
         return ret
