@@ -194,16 +194,21 @@ class LinearTransform:
                 # Unary negation
                 traverse(children[0], -sign)
             elif op_name in ['fp.mul', '*']:
-                # Try to evaluate as constant * variable
                 assert len(children) == 2
                 left, right = children
-                # constant * variable_expression
+                # Try constant * variable first
                 try:
                     coef_val = self._extract_constant(left)
                     coef = Fraction(Decimal(str(coef_val)))
                     traverse(right, sign * coef)
                 except:
-                    raise ValueError(f"Cannot parse multiplication: {e}")
+                    # Try variable * constant
+                    try:
+                        coef_val = self._extract_constant(right)
+                        coef = Fraction(Decimal(str(coef_val)))
+                        traverse(left, sign * coef)
+                    except:
+                        raise ValueError(f"Cannot parse multiplication: {e}")
             elif e.decl().kind() == z3.Z3_OP_FPA_TO_FP:
                 traverse(e.arg(1), sign)
             else:
