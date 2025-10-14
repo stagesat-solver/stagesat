@@ -110,8 +110,6 @@ def mcmc(args, i, stop_event):
             print()
         X_star = scale(res.x, i)
         # R_star = res.fun
-        if stop_event.is_set():
-            break
         if res.fun >= args.round1_threshold:
             # bad results, retry
             continue
@@ -120,6 +118,8 @@ def mcmc(args, i, stop_event):
         if round_num > args.round2_activate and best_R_star > args.round2_threshold:
             if args.showTime:
                 print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            if stop_event.is_set():
+                break
             rec = foo_ulp.R(*X_star)
             sp2 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
             res_round2 = op.basinhopping(
@@ -147,6 +147,8 @@ def mcmc(args, i, stop_event):
         ########################################################################################
         if args.showTime:
             print("[Xsat] round3_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        if stop_event.is_set():
+            break
         sp3 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
         def obj_near3(N):
             X3_moved = np.array([
