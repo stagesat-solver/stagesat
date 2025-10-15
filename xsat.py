@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 from src.utils.sort import Sort
-import src.optimization.mcmc as op_mcmc
+import src.optimization.mcmc_cython as op_mcmc
 import src.utils.verification as verification
 np.set_printoptions(precision=2000, suppress=True)
 
