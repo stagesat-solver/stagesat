@@ -125,15 +125,9 @@ def mcmc(args, int i, stop_event):
         if stop_event.is_set():
             break
         np.random.seed()
-        if args.method == 'noop_min':
-            _minimizer_kwargs = dict(method=noop_min)
-        else:
-            _minimizer_kwargs = dict(method=args.method)
+        _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
         # Add noise to starting point (20% chance of larger noise)
-        if random.random() < 0.2:
-            noise_range = 0.5
-        else:
-            noise_range = 5e-50
+        noise_range = 0.5 if random.random() < 0.2 else 5e-50
         sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
         
         # Round 1: Basin hopping with square objective
