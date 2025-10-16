@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import struct
 import importlib
 import warnings
@@ -100,6 +101,7 @@ def nth_fp32_vectorized(n, x):
     return struct.unpack('f', bit_pattern)[0]
 
 def mcmc(args, int i, stop_event):
+    cdef double start_time = time.process_time()
     # Load float32 mask to determine which variables are float32
     cdef cnp.ndarray f32_mask
     with open("build/f32_mask.npy", "rb") as f:
@@ -213,4 +215,5 @@ def mcmc(args, int i, stop_event):
                 print(f"//////////////////////////////R3 found a best_R_star: {best_R_star} + R1: {res.fun}")
         if best_R_star == 0:
             break
-    return best_X_star, best_R_star
+    cdef double elapsed_time = time.process_time() - start_time
+    return best_X_star, best_R_star, elapsed_time

@@ -153,9 +153,11 @@ def main():
     X_star = None
     R_star = float('inf')
     num_workers_finished = 0
+    worker_times = []
     try:
         while num_workers_finished < len(processes):
-            X, R = results_queue.get()
+            X, R, cpu_time = results_queue.get()
+            worker_times.append(cpu_time)
             num_workers_finished += 1
             if R <= R_star:
                 R_star = R
@@ -214,8 +216,7 @@ def main():
         print("nVar = ", len(symbolTable))
     if args.showTime:
         print("[Xsat] Time elapsed:")
-        #        print "  parse_and_compile    : %g seconds " % (t_parse_and_compile-t_start)
-        print("  solve (all)  : %g seconds" % (t_mcmc - t_start))
+        print("  solve (all) cpu time : %g seconds" % (max(worker_times)))
         print("  verify : %g seconds" % (t_verify - t_mcmc))
         print("\n  Total        : %g seconds" % (t_verify - t_start))
 
