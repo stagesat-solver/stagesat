@@ -91,6 +91,7 @@ def get_parser():
                         action='store_true')
     parser.add_argument("--printModel", help="print the model", default=False, action='store_true')
     parser.add_argument("--bench", help="benchmarking mode", default=False, action='store_true')
+    parser.add_argument("--cpuTime", help="benchmarking mode", default=False, action='store_true')
     parser.add_argument("--genOnly", help="generate code only, without deciding satisfiability", default=False,
                         action='store_true')
     return parser
@@ -132,6 +133,8 @@ def main():
         symbolTable = pickle.load(f)
     if len(symbolTable) == 0:
         print("sat")
+        if args.cpuTime:
+            print(0)
         sys.exit(0)
     try:
         names = list(symbolTable.keys())
@@ -219,7 +222,8 @@ def main():
         print("  solve (all) cpu time : %g seconds" % (max(worker_times)))
         print("  verify : %g seconds" % (t_verify - t_mcmc))
         print("\n  Total        : %g seconds" % (t_verify - t_start))
-
+    if args.cpuTime:
+        print(max(worker_times))
 
 if __name__ == "__main__":
     main()
