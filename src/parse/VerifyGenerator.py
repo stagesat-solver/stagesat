@@ -284,6 +284,19 @@ class VerifyGenerator():
             result.append(toAppend)
             return verification.var_name(expr_z3)
 
+        if z3.is_or(expr_z3):
+            if DEBUG: print("-- Branch _is_or")
+            # Handle OR by combining all arguments with BOR (boolean OR)
+            toAppendExpr = self._gen(expr_z3.arg(0), symbolTable, cache, result)
+            for i in range(1, expr_z3.num_args()):
+                toAppendExpr = 'BOR( %s,%s )' % (toAppendExpr, self._gen(expr_z3.arg(i), symbolTable, cache, result))
+            toAppend = "double %s = %s; " \
+                       % (verification.var_name(expr_z3), \
+                          toAppendExpr, \
+                          )
+            result.append(toAppend)
+            return verification.var_name(expr_z3)
+
         if z3.is_not(expr_z3):
             if DEBUG:
                 print("-- Branch _is_not")

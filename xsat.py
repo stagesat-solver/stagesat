@@ -48,7 +48,7 @@ def get_parser():
     parser = argparse.ArgumentParser(prog='Xsat')
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 2.0.0')
     parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=30)
-    parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=30)
+    parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=50)
     parser.add_argument('--method', help='Local minimization procedure', default='powell',
                         choices=['powell', 'slsqp', 'cg', 'l-bfgs-b', 'cobyla', 'tnc', 'bfgs', 'nelder-mead',
                                  'noop_min']
@@ -78,7 +78,7 @@ def get_parser():
                         default=1.0)
     parser.add_argument('--round1_threshold', help='threshold  for round1', action='store', type=float, default=1e-11)
     parser.add_argument('--round2_threshold', help='threshold  for round2', action='store', type=float, default=1e10)
-    parser.add_argument('--round2_activate', help='threshold  for round2', action='store', type=float, default=15)
+    parser.add_argument('--round2_activate', help='threshold  for round2', action='store', type=float, default=0.7)
     parser.add_argument("--multi", help="multi-processing (default: true)", default=True, action='store', type=str2bool)
     # parser.add_argument("--single", help="single processor  (default: true)",default=True,action='store')
     # parser.add_argument("--round2", help="activate round2 when unsat (default: false)",default=False,action='store_true')
