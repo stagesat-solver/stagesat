@@ -48,7 +48,7 @@ def get_parser():
     parser = argparse.ArgumentParser(prog='Xsat')
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 2.0.0')
     parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=30)
-    parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=50)
+    parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=30)
     parser.add_argument('--method', help='Local minimization procedure', default='powell',
                         choices=['powell', 'slsqp', 'cg', 'l-bfgs-b', 'cobyla', 'tnc', 'bfgs', 'nelder-mead',
                                  'noop_min']
