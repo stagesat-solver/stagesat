@@ -131,13 +131,13 @@ def mcmc(args, int i, stop_event):
         # Add noise to starting point (20% chance of larger noise)
         noise_range = 0.5 if random.random() < 0.2 else 5e-50
         sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
-        has_round2 = (round_num / args.nStartOver) >= args.round2_activate and best_R_star > args.round2_threshold
+        is_r1_bad = (round_num / args.nStartOver) >= args.round2_activate and best_R_star > args.round2_threshold
         # Round 1: Basin hopping with square objective
         res = op.basinhopping(
             lambda X: R_quick(X, i, foo_square.R),
             sp,
             niter=args.niter,
-            stepsize=args.stepSize,
+            stepsize=1 if is_r1_bad else args.stepSize,
             minimizer_kwargs=_minimizer_kwargs,
             callback=callback
         )
@@ -147,12 +147,12 @@ def mcmc(args, int i, stop_event):
             print()
         X_star = scale(res.x, i)
         # Skip if result is too poor
-        if not has_round2 and res.fun >= args.round1_threshold:
+        if res.fun >= args.round1_threshold:
             continue
         ########################################################################
         # Optional Round 2: ULP-based refinement when round 1 is not good enough
         ########################################################################
-        if has_round2:
+        if is_r1_bad:
             if args.showTime:
                 print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             if stop_event.is_set():
