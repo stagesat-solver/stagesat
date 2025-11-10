@@ -67,7 +67,7 @@ def main():
                     continue
 
                 # NOTE: The only change is replacing 'mathsat' with 'z3'
-                command = f"timeout {args.timeout}s /usr/bin/time -f \"real %e\" z3 \"{filepath}\""
+                command = f"timeout {args.timeout}s /usr/bin/time -f \"real %e\" z3 memory_max_size=32768 \"{filepath}\""
                 
                 satisfiability_result = ''
                 time_result = ''
@@ -103,6 +103,9 @@ def main():
                     if e.returncode == 124:
                         print(f"  -> TIMEOUT after {args.timeout} seconds.")
                         satisfiability_result = 'timeout'
+                    elif e.returncode in [137, -9]:  # OOM killer
+                        print(f"  -> OUT OF MEMORY (killed by OOM)")
+                        satisfiability_result = 'oom'
                     else:
                         print(f"  -> ERROR: Command failed with exit code {e.returncode}.")
                         print(f"    Stderr: {e.stderr}")
@@ -118,6 +121,7 @@ def main():
                 row['Satisfiability'] = satisfiability_result
                 row['Time(s)'] = time_result
                 writer.writerow(row)
+                outfile.flush()
 
     except IOError as e:
         print(f"Error: Could not read/write CSV file. {e}")

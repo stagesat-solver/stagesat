@@ -19,7 +19,7 @@ def main():
     parser.add_argument("csv_file", help="Path to the input CSV file.")
     parser.add_argument("smt_folder", help="Path to the folder containing the .smt2 files.")
     parser.add_argument("-o", "--output", default=None, help="Path to the output CSV file. Defaults to <input_file>_results.csv.")
-    parser.add_argument("-t", "--timeout", type=int, default=172800, help="Timeout for each run in seconds.")
+    parser.add_argument("-t", "--timeout", type=int, default=1200, help="Timeout for each run in seconds.")
     
     args = parser.parse_args()
 

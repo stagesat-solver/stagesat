@@ -20,6 +20,7 @@ R_ULP_=$(OUT_)/R_ulp
 R_VERIFY_=$(OUT_)/R_verify
 
 XSAT_GEN=$(XSAT_)/xsat_gen.py
+CYTHON_DIR=src/optimization
 
 ifdef IN
    $(shell echo $(IN) > XSAT_IN.txt)
@@ -94,9 +95,21 @@ helloworld: Benchmarks/div3.c.50.smt2
 
 clean:
 	$(XSAT_echo) Cleaning build/ and Results/
-	@rm -vf build/foo.c build/foo_square.c build/foo_ulp.c build/foo.symbolTable
+	@rm -vf build/*.c build/foo.symbolTable
 	@rm -vfr build/R_square build/R_ulp build/R_verify
 	@rm -vf Results/*
 
+cython:
+	@echo "[StageSAT] Building Cython extensions in $(CYTHON_DIR)..."
+	@cd $(CYTHON_DIR) && python3 setup.py build_ext --inplace
+	@echo "[StageSAT] Cython build complete"
+
+clean_cython:
+	@echo "[StageSAT] Cleaning Cython files"
+	@find $(CYTHON_DIR) -name "*.so" -delete
+	@find $(CYTHON_DIR) -name "*.c" -not -name "setup.py" -delete
+	@find $(CYTHON_DIR) -name "*.html" -delete
+	@find $(CYTHON_DIR) -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf $(CYTHON_DIR)/build
 
 .PHONY: copy gen clean compile compile_square compile_ulp test
