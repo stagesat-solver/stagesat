@@ -41,26 +41,48 @@ class LinearSquareTransform(LinearTransform):
             b.append(rhs_k - lhs_k)
         return A, b
 
+    # def square_projection_objective(self, constraints: List[FPRef]):
+    #     A, b = self.build_A_b(constraints)
+    #     if not A:
+    #         return ""
+    #     try:
+    #         AT = LinearTransform._mat_transpose(A)
+    #         AAT = LinearTransform._mat_mul(A, AT)
+    #         AAT_inv = LinearTransform._mat_inv(AAT)
+    #         P = LinearTransform._mat_mul(AT, AAT_inv)
+    #         PA = LinearTransform._mat_mul(P, A)
+    #         I = LinearTransform._mat_eye(len(self.var))
+    #         M = LinearTransform._mat_add(I, PA, sign=-1)
+    #         c = LinearTransform._mat_vec(P, b)
+    #         return self._gen_matrix_code(M, c)
+    #     except ValueError as e:
+    #         # Matrix is singular (redundant or over-determined constraints)
+    #         # Fall back to direct constraint evaluation without projection
+    #         import warnings
+    #         warnings.warn(f"Singular matrix detected: {e}. Using direct constraint evaluation instead of projection.")
+    #         return ""
+
     def square_projection_objective(self, constraints: List[FPRef]):
         A, b = self.build_A_b(constraints)
         if not A:
             return ""
+        AT = LinearTransform._mat_transpose(A)
+        AAT = LinearTransform._mat_mul(A, AT)
         try:
-            AT = LinearTransform._mat_transpose(A)
-            AAT = LinearTransform._mat_mul(A, AT)
             AAT_inv = LinearTransform._mat_inv(AAT)
-            P = LinearTransform._mat_mul(AT, AAT_inv)
-            PA = LinearTransform._mat_mul(P, A)
-            I = LinearTransform._mat_eye(len(self.var))
-            M = LinearTransform._mat_add(I, PA, sign=-1)
-            c = LinearTransform._mat_vec(P, b)
-            return self._gen_matrix_code(M, c)
-        except ValueError as e:
-            # Matrix is singular (redundant or over-determined constraints)
-            # Fall back to direct constraint evaluation without projection
+        except ValueError:
             import warnings
-            warnings.warn(f"Singular matrix detected: {e}. Using direct constraint evaluation instead of projection.")
-            return ""
+            warnings.warn(
+                "Singular matrix detected in AA^T. Using Moore-Penrose pseudoinverse "
+                "as described in Section 2 of the paper."
+            )
+            AAT_inv = LinearTransform._mat_pinv(AAT)
+        P = LinearTransform._mat_mul(AT, AAT_inv)
+        PA = LinearTransform._mat_mul(P, A)
+        I = LinearTransform._mat_eye(len(self.var))
+        M = LinearTransform._mat_add(I, PA, sign=-1)
+        c = LinearTransform._mat_vec(P, b)
+        return self._gen_matrix_code(M, c)
 
     def _gen_matrix_code(self, M, c):
         var_lis = sorted(self.var)

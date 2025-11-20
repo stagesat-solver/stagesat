@@ -16,8 +16,8 @@ class ExpressionGenerator:
         self.result = []
         # Hybrid approach attributes
         self.linear_eq_constraints = []  # List of (id, lhs_expr, rhs_expr, c_var_name)
+        self.linear_neq_constraints = []
         self.other_constraints = []  # List of (id, c_var_name)
-        self.use_hybrid = True  # Flag to enable/disable hybrid approach
         self.inside_or = False
         # Linearity analysis
         self.linearity_info = {}  # Maps expr_id -> (is_linear, expr_str)
@@ -28,6 +28,7 @@ class ExpressionGenerator:
         self.cache = set()
         self.result = []
         self.linear_eq_constraints = []
+        self.linear_neq_constraints = []
         self.other_constraints = []
         self.inside_or = False
         self.linearity_info = {}
@@ -311,6 +312,8 @@ class ExpressionGenerator:
 
     def handle_comparison(self, expr_z3):
         """Handle comparison operations (LE, LT, GE, GT)."""
+        lhs_expr = expr_z3.arg(0)
+        rhs_expr = expr_z3.arg(1)
         sort_z3 = expr_z3.decl().kind()
         op_map = {
             z3.Z3_OP_FPA_LE: "DLE",
@@ -330,6 +333,8 @@ class ExpressionGenerator:
         expr_id = expr_z3.get_id()
         self.linearity_info[expr_id] = (
             is_linear, f"CONSTRAINT_{constraint_name}(lhs={lhs_linear},rhs={rhs_linear})")
+        if is_linear and not self.inside_or:
+            self.linear_neq_constraints.append((expr_id, lhs_expr, rhs_expr, verification.var_name(expr_z3)))
         func_name = self.get_comparison_function(base_func, lhs_type, rhs_type)
         comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
         toAppend = f"double {verification.var_name(expr_z3)} = {func_name}({lhs},{rhs});{comment}"
@@ -343,10 +348,6 @@ class ExpressionGenerator:
         """Handle equality operations."""
         lhs_expr = expr_z3.arg(0)
         rhs_expr = expr_z3.arg(1)
-        if str(lhs_expr) == "b2181":
-            a = 1
-        if str(lhs_expr) == "b1922":
-            a = 1
         lhs = self._gen_recursive(lhs_expr)
         rhs = self._gen_recursive(rhs_expr)
         lhs_type = self.get_operand_type(lhs_expr, self.symbolTable, self.cache)
@@ -357,7 +358,7 @@ class ExpressionGenerator:
         expr_id = expr_z3.get_id()
         self.linearity_info[expr_id] = (
             is_linear, f"CONSTRAINT_EQ(lhs={lhs_linear},rhs={rhs_linear})")
-        if self.use_hybrid and is_linear and not self.inside_or:
+        if is_linear and not self.inside_or:
             self.linear_eq_constraints.append((expr_id, lhs_expr, rhs_expr, verification.var_name(expr_z3)))
             comment = " // LINEAR EQ - for projection objective"
         else:

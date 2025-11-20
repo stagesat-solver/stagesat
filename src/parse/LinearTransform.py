@@ -1,10 +1,13 @@
 import z3
 import sympy
+import warnings
+import numpy as np
 from math import gcd
 from decimal import Decimal
 from functools import reduce
 from fractions import Fraction
 from z3 import FPRef, is_fp_value, is_const, simplify
+from sympy import Matrix, Rational
 import src.utils.z3_util as z3_util
 import src.utils.verification as verification
 
@@ -52,6 +55,31 @@ class LinearTransform:
                 if factor != 0:
                     M[r] = [vr - factor * vc for vr, vc in zip(M[r], M[col])]
         return [row[n:] for row in M]
+
+    @staticmethod
+    def _mat_pinv(A):
+        A_sympy = Matrix([[Rational(cell.numerator, cell.denominator)
+                           for cell in row] for row in A])
+        try:
+            # Compute pseudoinverse using sympy
+            A_pinv_sympy = A_sympy.pinv()
+            # Convert back to Fraction
+            A_pinv = []
+            for i in range(A_pinv_sympy.rows):
+                row = []
+                for j in range(A_pinv_sympy.cols):
+                    val = A_pinv_sympy[i, j]
+                    # Convert sympy Rational to Python Fraction
+                    frac = Fraction(int(val.p), int(val.q))
+                    row.append(frac)
+                A_pinv.append(row)
+            return A_pinv
+        except Exception as e:
+            warnings.warn(f"sympy pinv failed: {e}. Falling back to numpy.")
+            A_float = np.array([[float(cell) for cell in row] for row in A])
+            A_pinv_float = np.linalg.pinv(A_float)
+            return [[Fraction(float(cell)).limit_denominator(10 ** 10)
+                     for cell in row] for row in A_pinv_float]
 
     @staticmethod
     def _mat_add(A, B, sign=1):
