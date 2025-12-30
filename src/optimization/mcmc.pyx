@@ -10,6 +10,12 @@ cimport numpy as cnp
 import scipy.optimize as op
 import multiprocessing as mp
 import importlib.util
+cimport cython
+from libc.stdint cimport uint64_t, uint32_t, int64_t, int32_t
+from libc.string cimport memcpy
+# Type definitions
+ctypedef cnp.float64_t DTYPE_t
+ctypedef cnp.float32_t DTYPE32_t
 
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
@@ -19,10 +25,6 @@ importlib.reload(foo_ulp)
 sys.path.insert(0, os.path.join(os.getcwd(), "build/R_square"))
 import foo_square
 importlib.reload(foo_square)
-
-# Type definitions
-ctypedef cnp.float64_t DTYPE_t
-ctypedef cnp.float32_t DTYPE32_t
 
 class BasinHoppingCallback:
     """Callback class for basin hopping optimization."""
@@ -53,52 +55,78 @@ def R_quick(cnp.ndarray X, int i, f):
 def mcmc_bis(int i):
     print("*******value of i = ", i)
 
-@np.vectorize
-def nth_fp_vectorized(n, x):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline double nth_fp(long long n, double x) nogil:
     """
-    Get the nth floating point number from x (double precision).
-    Uses little-endian byte order.
+    Get the nth floating point number from x.
     """
+    cdef uint64_t bits, sign_bit
+    cdef int64_t m
+    cdef double result
     if x < 0:
-        return -nth_fp_vectorized(-n, -x)
-    cdef long long n_int = int(n)
-    cdef bytes s = struct.pack('<d', x)
-    cdef unsigned long long i = struct.unpack('<Q', s)[0]
-    cdef long long m = i + n_int
-    cdef unsigned long long sign_bit
+        return -nth_fp(-n, -x)
+    memcpy(&bits, &x, sizeof(double))
+    m = <int64_t> bits + n
     if m < 0:
-        sign_bit = 0x8000000000000000
+        sign_bit = 0x8000000000000000ULL
         m = -m
     else:
         sign_bit = 0
-    if m >= 0x7ff0000000000000:
-        m = 0x7ff0000000000000
-    cdef bytes bit_pattern = struct.pack('Q', m | sign_bit)
-    return struct.unpack('d', bit_pattern)[0]
+    if m >= 0x7ff0000000000000LL:
+        m = 0x7ff0000000000000LL
+    bits = <uint64_t> m | sign_bit
+    memcpy(&result, &bits, sizeof(double))
+    return result
 
-@np.vectorize
-def nth_fp32_vectorized(n, x):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline float nth_fp32(long n, float x) nogil:
     """
-    Get the nth floating point number from x (single precision).
-    Uses little-endian byte order.
+    Get the nth floating point number from x.
     """
+    cdef uint32_t bits, sign_bit
+    cdef int32_t m
+    cdef float result
     if x < 0:
-        return -nth_fp32_vectorized(-n, -x)
-    cdef long n_int = int(n)
-    cdef float x_f32 = np.float32(x)
-    cdef bytes s = struct.pack('<f', x_f32)
-    cdef unsigned int i = struct.unpack('<I', s)[0]
-    cdef long m = i + n_int
-    cdef unsigned int sign_bit
+        return -nth_fp32(-n, -x)
+    memcpy(&bits, &x, sizeof(float))
+    m = <int32_t> bits + n
     if m < 0:
-        sign_bit = 0x80000000
+        sign_bit = 0x80000000U
         m = -m
     else:
         sign_bit = 0
-    if m >= 0x7f800000:  # Float32 infinity
+    if m >= 0x7f800000:
         m = 0x7f800000
-    cdef bytes bit_pattern = struct.pack('I', m | sign_bit)
-    return struct.unpack('f', bit_pattern)[0]
+    bits = <uint32_t> m | sign_bit
+    memcpy(&result, &bits, sizeof(float))
+    return result
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cpdef cnp.ndarray transform_fp_separated(
+        cnp.ndarray[cnp.float64_t, ndim=1] N,
+        cnp.ndarray[cnp.float64_t, ndim=1] sp3,
+        cnp.ndarray[cnp.int64_t, ndim=1] f32_positions,
+        cnp.ndarray[cnp.int64_t, ndim=1] f64_positions):
+    cdef Py_ssize_t i, idx
+    cdef Py_ssize_t size = N.shape[0]
+    cdef Py_ssize_t n_f32 = f32_positions.shape[0]
+    cdef Py_ssize_t n_f64 = f64_positions.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(size, dtype=np.float64)
+    cdef long long n_val_i64
+    cdef long n_val_i32
+    for i in range(n_f32):
+        idx = f32_positions[i]
+        n_val_i32 = <long> N[idx]
+        result[idx] = nth_fp32(n_val_i32, <float> sp3[idx])
+    for i in range(n_f64):
+        idx = f64_positions[i]
+        n_val_i64 = <long long> N[idx]
+        result[idx] = nth_fp(n_val_i64, sp3[idx])
+    return result
 
 def mcmc(args, int i, stop_event):
     cdef double start_time = time.process_time()
@@ -106,13 +134,8 @@ def mcmc(args, int i, stop_event):
     cdef cnp.ndarray f32_mask
     with open("build/f32_mask.npy", "rb") as f:
         f32_mask = np.load(f)
-    cdef cnp.ndarray f32_indices = np.where(f32_mask)[0]
-    cdef cnp.ndarray f64_indices = np.where(~f32_mask)[0]
-    # Create dispatchers for nth_fp based on variable type
-    nth_fp_dispatchers = [
-        nth_fp32_vectorized if j in f32_indices else nth_fp_vectorized
-        for j in range(foo_square.dim)
-    ]
+    cdef cnp.ndarray f32_positions = np.where(f32_mask)[0].astype(np.int64)
+    cdef cnp.ndarray f64_positions = np.where(~f32_mask)[0].astype(np.int64)
     cdef cnp.ndarray best_X_star = np.zeros(foo_square.dim)
     cdef double best_R_star = float('inf')
     callback = BasinHoppingCallback(stop_event)
@@ -121,7 +144,7 @@ def mcmc(args, int i, stop_event):
     cdef double R_star, rec
     cdef double noise_range
     cdef dict _minimizer_kwargs
-    
+
     # Main optimization loop
     for round_num in range(args.nStartOver):
         if stop_event.is_set():
@@ -190,10 +213,7 @@ def mcmc(args, int i, stop_event):
             break
         sp3 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
         def obj_near3(N):
-            X3_moved = np.array([
-                nth_fp_dispatchers[j](n_val, x_base_val)
-                for j, (n_val, x_base_val) in enumerate(zip(N, sp3))
-            ])
+            X3_moved = transform_fp_separated(N, sp3, f32_positions, f64_positions)
             return foo_ulp.R(*X3_moved)
         res_round3 = op.basinhopping(
             obj_near3,
@@ -204,10 +224,7 @@ def mcmc(args, int i, stop_event):
             callback=callback
         )
         R_star = res_round3.fun
-        X_star = np.array([
-            nth_fp_dispatchers[j](n_val, x_base_val)
-            for j, (n_val, x_base_val) in enumerate(zip(res_round3.x, sp3))
-        ])
+        X_star = transform_fp_separated(res_round3.x, sp3, f32_positions, f64_positions)
         if R_star < best_R_star:
             best_R_star = R_star
             best_X_star = X_star
