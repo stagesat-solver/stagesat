@@ -79,6 +79,7 @@ def get_parser():
     parser.add_argument('--round1_threshold', help='threshold  for round1', action='store', type=float, default=1e-11)
     parser.add_argument('--round2_threshold', help='threshold  for round2', action='store', type=float, default=1e10)
     parser.add_argument('--round2_activate', help='threshold  for round2', action='store', type=float, default=0.7)
+    parser.add_argument('--large_dim', help='threshold for large benchmarks', action='store', type=float, default=500)
     parser.add_argument("--multi", help="multi-processing (default: true)", default=True, action='store', type=str2bool)
     # parser.add_argument("--single", help="single processor  (default: true)",default=True,action='store')
     # parser.add_argument("--round2", help="activate round2 when unsat (default: false)",default=False,action='store_true')

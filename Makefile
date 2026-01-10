@@ -44,17 +44,27 @@ build/foo.c: $(IN)  XSAT_IN.txt
 	@mkdir -p build
 	python xsat_gen.py $<  > $@
 
-compile_square: build/R_square/foo_square.so
-build/R_square/foo_square.so: include/R_square/xsat.h $(IN)
+compile_square: build/R_square/foo_square.so build/R_square/foo_square_large.so
+build/foo_square.c: $(IN)
 	@echo "[XSAT] .smt2 -> build/foo_square.c (square mode)"
 	@mkdir -p build
 	@python xsat_gen.py $(IN) --square > build/foo_square.c
-	@echo [XSAT]Compiling the representing function as $@
+build/R_square/foo_square.so: include/R_square/xsat.h build/foo_square.c
+	@echo [XSAT]Compiling foo_square.so with xsat.h
 	@mkdir -p build/R_square
 	@clang -O3 -fPIC build/foo_square.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_square \
 		-DMODULE_NAME=\"foo_square\" \
 		-fbracket-depth=3000
+build/R_square/foo_square_large.so: include/R_square/xsat_large.h build/foo_square.c
+	@echo [XSAT]Compiling foo_square_large.so with xsat_large.h
+	@mkdir -p build/R_square
+	@sed 's/#include "xsat\.h"/#include "xsat_large.h"/' build/foo_square.c > build/foo_square_large_tmp.c
+	@clang -O3 -fPIC build/foo_square_large_tmp.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
+		-DPyInit_foo=PyInit_foo_square_large \
+		-DMODULE_NAME=\"foo_square_large\" \
+		-fbracket-depth=3000
+	@rm -f build/foo_square_large_tmp.c
 
 compile_ulp: build/R_ulp/foo_ulp.so
 build/R_ulp/foo_ulp.so: include/R_ulp/xsat.h $(IN)
