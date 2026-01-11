@@ -156,8 +156,9 @@ def mcmc(args, int i, stop_event):
             break
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
-        sp = np.zeros(foo_square.dim) + args.startPoint
-        is_r1_bad = (round_num / args.nStartOver) >= args.round2_activate and best_R_star > args.round2_threshold
+        noise_range = 0 if use_large else (0.5 if random.random() < 0.2 else 0)
+        sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
+        is_r1_bad = (round_num / nStartOver) >= args.round2_activate and best_R_star > args.round2_threshold
         # Round 1: Basin hopping with square objective
         res = op.basinhopping(
             lambda X: R_quick(X, real_i, R_func),
