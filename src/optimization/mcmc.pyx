@@ -147,9 +147,16 @@ def mcmc(args, int i, stop_event):
     cdef double noise_range
     cdef dict _minimizer_kwargs
     cdef bint use_large = foo_square.dim > args.large_dim
-    cdef int real_i = 2 if use_large else i
-    cdef int nStartOver = 1500 if use_large else args.nStartOver
-    R_func = foo_square_large.R if use_large else foo_square.R
+    cdef int nStartOver = args.nStartOver
+    cdef double round3_stepsize = args.round3_stepsize
+    cdef double startPoint = args.startPoint
+    R_func = foo_square.R
+    if use_large:
+        i = 2
+        nStartOver = 1500
+        round3_stepsize = 1.0
+        startPoint = 0.8
+        R_func = foo_square_large.R
     # Main optimization loop
     for round_num in range(nStartOver):
         if stop_event.is_set():
@@ -157,11 +164,11 @@ def mcmc(args, int i, stop_event):
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
         noise_range = 0 if use_large else (0.5 if random.random() < 0.2 else 0)
-        sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
+        sp = np.zeros(foo_square.dim) + startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
         is_r1_bad = (round_num / nStartOver) >= args.round2_activate and best_R_star > args.round2_threshold
         # Round 1: Basin hopping with square objective
         res = op.basinhopping(
-            lambda X: R_quick(X, real_i, R_func),
+            lambda X: R_quick(X, i, R_func),
             sp,
             niter=args.niter,
             stepsize=1 if is_r1_bad else args.stepSize,
@@ -172,7 +179,7 @@ def mcmc(args, int i, stop_event):
             print("result (round 1) with i = ", i, ":")
             print(f"{res.fun}")
             print()
-        X_star = scale(res.x, real_i)
+        X_star = scale(res.x, i)
         # Skip if result is too poor
         if res.fun >= args.round1_threshold:
             continue
@@ -187,7 +194,7 @@ def mcmc(args, int i, stop_event):
             rec = foo_ulp.R(*X_star)
             sp2 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star
             res_round2 = op.basinhopping(
-                lambda X: foo_ulp.R(*scale(X, real_i)),
+                lambda X: foo_ulp.R(*scale(X, i)),
                 sp2,
                 niter=args.round2_niter,
                 stepsize=args.round2_stepsize,
@@ -198,7 +205,7 @@ def mcmc(args, int i, stop_event):
                 break
             if res_round2.fun < rec:
                 R_star = res_round2.fun
-                X_star = scale(tr_help(res_round2.x), real_i)
+                X_star = scale(tr_help(res_round2.x), i)
             else:
                 R_star = rec
             if R_star < best_R_star:
@@ -223,7 +230,7 @@ def mcmc(args, int i, stop_event):
             obj_near3,
             np.zeros(foo_ulp.dim),
             niter=args.round3_niter,
-            stepsize=1.0 if use_large else args.round3_stepsize,
+            stepsize=round3_stepsize,
             minimizer_kwargs=_minimizer_kwargs,
             callback=callback
         )
