@@ -146,26 +146,16 @@ def mcmc(args, int i, stop_event):
     cdef double R_star, rec
     cdef double noise_range
     cdef dict _minimizer_kwargs
-    cdef bint use_large = foo_square.dim > args.large_dim
-    cdef int nStartOver = args.nStartOver
-    cdef double round3_stepsize = args.round3_stepsize
-    cdef double startPoint = args.startPoint
-    R_func = foo_square.R
-    if use_large:
-        i = 2
-        nStartOver = 1500
-        round3_stepsize = 1.0
-        startPoint = 0.8
-        R_func = foo_square_large.R
+    R_func = foo_square_large.R if args.use_large else foo_square.R
     # Main optimization loop
-    for round_num in range(nStartOver):
+    for round_num in range(args.nStartOver):
         if stop_event.is_set():
             break
         np.random.seed()
         _minimizer_kwargs = dict(method=noop_min) if args.method == 'noop_min' else dict(method=args.method)
-        noise_range = 0 if use_large else (0.5 if random.random() < 0.2 else 0)
-        sp = np.zeros(foo_square.dim) + startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
-        is_r1_bad = (round_num / nStartOver) >= args.round2_activate and best_R_star > args.round2_threshold
+        noise_range = 0 if args.use_large else (0.5 if random.random() < 0.2 else 0)
+        sp = np.zeros(foo_square.dim) + args.startPoint + np.random.uniform(-noise_range, noise_range, foo_square.dim)
+        is_r1_bad = (round_num / args.nStartOver) >= args.round2_activate and best_R_star > args.round2_threshold
         # Round 1: Basin hopping with square objective
         res = op.basinhopping(
             lambda X: R_quick(X, i, R_func),
@@ -230,7 +220,7 @@ def mcmc(args, int i, stop_event):
             obj_near3,
             np.zeros(foo_ulp.dim),
             niter=args.round3_niter,
-            stepsize=round3_stepsize,
+            stepsize=args.round3_stepsize,
             minimizer_kwargs=_minimizer_kwargs,
             callback=callback
         )

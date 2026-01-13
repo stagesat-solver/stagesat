@@ -41,7 +41,8 @@ def create_typed_input(X, symbolTable):
 
 def worker_process(args, worker_id, queue, stop_event):
     """The function that each worker process will execute."""
-    result = op_mcmc.mcmc(args, worker_id, stop_event)
+    i = 2 if args.use_large else worker_id
+    result = op_mcmc.mcmc(args, i, stop_event)
     queue.put(result)
 
 def get_parser():
@@ -140,6 +141,13 @@ def main():
         if args.time:
             print(0)
         sys.exit(0)
+    if len(symbolTable.keys()) > args.large_dim:
+        args.use_large = True
+        args.nStartOver = 1500
+        args.round3_stepsize = 1.0
+        args.startPoint = 0.8
+    else:
+        args.use_large = False
     try:
         names = list(symbolTable.keys())
         types = list(symbolTable.values())
