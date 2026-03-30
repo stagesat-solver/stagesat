@@ -305,7 +305,7 @@ class ExpressionGenerator:
         elif z3_util.is_false(expr_z3):
             str_ret = "1"
         else:
-            raise NotImplementedError("[XSat] type not considered")
+            raise NotImplementedError("[stagesat] type not considered")
         if expr_z3.sort() == z3.Float32():
             str_ret = str_ret + "f"
         return str_ret

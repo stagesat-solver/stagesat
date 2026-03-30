@@ -4,7 +4,7 @@ class CodeTemplate:
     @staticmethod
     def get_template():
         return """#include <Python.h>
-    #include "xsat.h"
+    #include "stagesat.h"
     #include <math.h>
 
     %(matrix_functions)s
@@ -59,7 +59,7 @@ class CodeTemplate:
     def get_template_ulp():
         """Return the C code template for Python C extension module."""
         return """#include <Python.h>
-    #include "xsat.h"
+    #include "stagesat.h"
     #include <math.h>
     %(ulp_projection)s
     %(ulp_f32_projection)s
@@ -111,7 +111,7 @@ class CodeTemplate:
     @staticmethod
     def get_empty_template():
         template = """#include <Python.h>
-    #include "xsat.h"
+    #include "stagesat.h"
     #include <math.h>
 
     static PyObject* R(PyObject* self, PyObject *args){

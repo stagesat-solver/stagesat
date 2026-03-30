@@ -178,7 +178,7 @@ def mcmc(args, int i, stop_event):
         ########################################################################
         if is_r1_bad:
             if args.showTime:
-                print("[Xsat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                print("[stagesat] round2_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             if stop_event.is_set():
                 break
             rec = foo_ulp.R(*X_star)
@@ -209,7 +209,7 @@ def mcmc(args, int i, stop_event):
         # Round 3: Floating point neighborhood search
         ########################################################################
         if args.showTime:
-            print("[Xsat] round3_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print("[stagesat] round3_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         if stop_event.is_set():
             break
         sp3 = np.array([X_star + 0]) if X_star.ndim == 0 else X_star

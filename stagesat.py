@@ -46,7 +46,7 @@ def worker_process(args, worker_id, queue, stop_event):
     queue.put(result)
 
 def get_parser():
-    parser = argparse.ArgumentParser(prog='Xsat')
+    parser = argparse.ArgumentParser(prog='stagesat')
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 2.0.0')
     parser.add_argument('--niter', help='niter in basinhopping', action='store', type=int, required=False, default=30)
     parser.add_argument('--nStartOver', help='startOver times', action='store', type=int, required=False, default=30)
@@ -124,14 +124,14 @@ def main():
         warnings.filterwarnings("ignore")
     t_start = time.time()
     # use z3 frontend
-    with open("XSAT_IN.txt") as f:
+    with open("STAGESAT_IN.txt") as f:
         try:
             expr_z3_lis = z3.parse_smt2_file(f.read().rstrip())
             expr_z3 = z3.And(expr_z3_lis)
             expr_z3 = z3.simplify(expr_z3)
         except z3.Z3Exception as e:
             print(e)
-            sys.stderr.write("[Xsat] The Z3 front-end fails when verifying the model.\n")
+            sys.stderr.write("[stagesat] The Z3 front-end fails when verifying the model.\n")
     with open("build/foo.symbolTable", "rb") as f:
         symbolTable = pickle.load(f)
     if len(symbolTable) == 0:
@@ -156,9 +156,9 @@ def main():
         with open("build/f32_mask.npy", "wb") as _f:
             np.save(_f, f32_mask)
     except Exception as _e:
-        print("[Xsat] Warning: failed to persist f32 mask:", _e)
+        print("[stagesat] Warning: failed to persist f32 mask:", _e)
     if args.showTime:
-        print("[Xsat] ENTERING: main_multi")
+        print("[stagesat] ENTERING: main_multi")
     results_queue = mp.Queue()
     stop_event = mp.Event()
     processes = [mp.Process(target=worker_process, args=(args, i, results_queue, stop_event))
@@ -179,7 +179,7 @@ def main():
                 X_star = X
             if R_star == 0:
                 if args.showTime:
-                    print("[Xsat Host] Optimal solution found. Terminating workers.")
+                    print("[stagesat Host] Optimal solution found. Terminating workers.")
                 stop_event.set()
                 break
     finally:
@@ -201,7 +201,7 @@ def main():
     t_mcmc = time.time()
     if args.verify:
         if args.showTime:
-            print("[Xsat] verify X_star with z3 front-end")
+            print("[stagesat] verify X_star with z3 front-end")
         verified = verification.verify_solution(expr_z3, X_star, symbolTable, printModel=args.printModel)
         if verified and R_star != 0:
             sys.stderr.write("WARNING!!!!!!!!!!!!!!!! Actually sat.\n")
@@ -211,15 +211,15 @@ def main():
             pass
     if args.verify2:
         if args.showTime:
-            print("[Xsat] verify X_star with build/R_verify")
+            print("[stagesat] verify X_star with build/R_verify")
         sys.path.insert(0, os.path.join(os.getcwd(), "build/R_verify"))
         import foo_verify
         importlib.reload(foo_verify)
         verify_res = foo_verify.R(*X_star) if foo_verify.dim == 1 else foo_verify.R(*(X_star))
         if verify_res == 0 and R_star != 0:
-            sys.stderr.write("WARNING from verify2 (using include/R_verify/xsat.h) !!!!!!!!!!!!!!!! Actually sat.\n")
+            sys.stderr.write("WARNING from verify2 (using include/R_verify/stagesat.h) !!!!!!!!!!!!!!!! Actually sat.\n")
         elif verify_res != 0 and R_star == 0:
-            sys.stderr.write("WARNING from verify2  (using include/R_verify/xsat.h) !!!!!!!!!!!!!!!  Wrong model ! \n")
+            sys.stderr.write("WARNING from verify2  (using include/R_verify/stagesat.h) !!!!!!!!!!!!!!!  Wrong model ! \n")
         else:
             pass
     t_verify = time.time()
@@ -230,7 +230,7 @@ def main():
     if args.showVariableNumber:
         print("nVar = ", len(symbolTable))
     if args.showTime:
-        print("[Xsat] Time elapsed:")
+        print("[stagesat] Time elapsed:")
         print("  solve (all) cpu time : %g seconds" % (max(worker_times)))
         print("  verify : %g seconds" % (t_verify - t_mcmc))
         print("\n  Total        : %g seconds" % (t_verify - t_start))

@@ -13,53 +13,53 @@ ifeq ($(UNAMES),Darwin)
 endif
 
 
-XSAT_ := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-OUT_=$(XSAT_)/out
+STAGESAT_ := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+OUT_=$(STAGESAT_)/out
 R_SQUARE_=$(OUT_)/R_square
 R_ULP_=$(OUT_)/R_ulp
 R_VERIFY_=$(OUT_)/R_verify
 
-XSAT_GEN=$(XSAT_)/xsat_gen.py
+STAGESAT_GEN=$(STAGESAT_)/stagesat_gen.py
 CYTHON_DIR=src/optimization
 
 ifdef IN
-   $(shell echo $(IN) > XSAT_IN.txt)
+   $(shell echo $(IN) > STAGESAT_IN.txt)
 endif
 
 
-IN:= $(shell cat XSAT_IN.txt)
+IN:= $(shell cat STAGESAT_IN.txt)
 
 PYTHON_H:=
 
-define XSAT_echo
-	@echo "[XSat] $1 "
+define STAGESAT_echo
+	@echo "[stagesat] $1 "
 endef
 
 
 all: clean compile
 
-gen:  build/foo.c xsat_gen.py
-build/foo.c: $(IN)  XSAT_IN.txt
-	@echo "[XSAT] .smt2 -> .c"
+gen:  build/foo.c stagesat_gen.py
+build/foo.c: $(IN)  STAGESAT_IN.txt
+	@echo "[stagesat] .smt2 -> .c"
 	@mkdir -p build
-	python xsat_gen.py $<  > $@
+	python stagesat_gen.py $<  > $@
 
 compile_square: build/R_square/foo_square.so build/R_square/foo_square_large.so
 build/foo_square.c: $(IN)
-	@echo "[XSAT] .smt2 -> build/foo_square.c (square mode)"
+	@echo "[stagesat] .smt2 -> build/foo_square.c (square mode)"
 	@mkdir -p build
-	@python xsat_gen.py $(IN) --square > build/foo_square.c
-build/R_square/foo_square.so: include/R_square/xsat.h build/foo_square.c
-	@echo [XSAT]Compiling foo_square.so with xsat.h
+	@python stagesat_gen.py $(IN) --square > build/foo_square.c
+build/R_square/foo_square.so: include/R_square/stagesat.h build/foo_square.c
+	@echo [stagesat]Compiling foo_square.so with stagesat.h
 	@mkdir -p build/R_square
 	@clang -O3 -fPIC build/foo_square.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_square \
 		-DMODULE_NAME=\"foo_square\" \
 		-fbracket-depth=3000
-build/R_square/foo_square_large.so: include/R_square/xsat_large.h build/foo_square.c
-	@echo [XSAT]Compiling foo_square_large.so with xsat_large.h
+build/R_square/foo_square_large.so: include/R_square/stagesat_large.h build/foo_square.c
+	@echo [stagesat]Compiling foo_square_large.so with stagesat_large.h
 	@mkdir -p build/R_square
-	@sed 's/#include "xsat\.h"/#include "xsat_large.h"/' build/foo_square.c > build/foo_square_large_tmp.c
+	@sed 's/#include "stagesat\.h"/#include "stagesat_large.h"/' build/foo_square.c > build/foo_square_large_tmp.c
 	@clang -O3 -fPIC build/foo_square_large_tmp.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_square_large \
 		-DMODULE_NAME=\"foo_square_large\" \
@@ -67,11 +67,11 @@ build/R_square/foo_square_large.so: include/R_square/xsat_large.h build/foo_squa
 	@rm -f build/foo_square_large_tmp.c
 
 compile_ulp: build/R_ulp/foo_ulp.so
-build/R_ulp/foo_ulp.so: include/R_ulp/xsat.h $(IN)
-	@echo "[XSAT] .smt2 -> build/foo_ulp.c (ulp mode)"
+build/R_ulp/foo_ulp.so: include/R_ulp/stagesat.h $(IN)
+	@echo "[stagesat] .smt2 -> build/foo_ulp.c (ulp mode)"
 	@mkdir -p build
-	@python xsat_gen.py $(IN) --ulp > build/foo_ulp.c
-	@echo [XSAT]Compiling the representing function as $@
+	@python stagesat_gen.py $(IN) --ulp > build/foo_ulp.c
+	@echo [stagesat]Compiling the representing function as $@
 	@mkdir -p build/R_ulp
 	@clang -O3 -fPIC build/foo_ulp.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_ulp $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_ulp \
@@ -79,11 +79,11 @@ build/R_ulp/foo_ulp.so: include/R_ulp/xsat.h $(IN)
 		-fbracket-depth=3000
 
 compile_verify: build/R_verify/foo_verify.so
-build/R_verify/foo_verify.so: include/R_verify/xsat.h $(IN)
-	@echo "[XSAT] .smt2 -> build/foo_verify.c (verify mode)"
+build/R_verify/foo_verify.so: include/R_verify/stagesat.h $(IN)
+	@echo "[stagesat] .smt2 -> build/foo_verify.c (verify mode)"
 	@mkdir -p build
-	@python xsat_gen.py $(IN) --verify > build/foo_verify.c
-	@echo [XSAT]Compiling the representing function as $@
+	@python stagesat_gen.py $(IN) --verify > build/foo_verify.c
+	@echo [stagesat]Compiling the representing function as $@
 	@mkdir -p build/R_verify
 	@clang -O3 -fPIC build/foo_verify.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_verify $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_verify \
@@ -93,18 +93,18 @@ build/R_verify/foo_verify.so: include/R_verify/xsat.h $(IN)
 compile: compile_square compile_ulp compile_verify
 
 solve: compile
-	@echo [XSAT] Executing the solver.
-	@python xsat.py
+	@echo [stagesat] Executing the solver.
+	@python stagesat.py
 
 test: test_benchmarks.py
 	python $
 
 helloworld: Benchmarks/div3.c.50.smt2
 	make IN=$>
-	python xsat.py
+	python stagesat.py
 
 clean:
-	$(XSAT_echo) Cleaning build/ and Results/
+	$(STAGESAT_echo) Cleaning build/ and Results/
 	@rm -vf build/*.c build/foo.symbolTable
 	@rm -vfr build/R_square build/R_ulp build/R_verify
 	@rm -vf Results/*

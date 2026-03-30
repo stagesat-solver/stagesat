@@ -162,8 +162,8 @@ class CodeGenerator:
         }
         return symbolTable, code
 
-def print_xsat_info():
-    """Print XSat banner information."""
+def print_stagesat_info():
+    """Print stagesat banner information."""
     try:
         logo = open('logo.txt', "r").read().strip('\n')
         print(logo)
@@ -171,13 +171,13 @@ def print_xsat_info():
         pass
     print()
     print("*" * 50)
-    print("XSat Version 04/04/2016 (OOP Refactored)")
-    print("Contributors: Zhoulai Fu and Zhendong Su")
+    print("stagesat Version 03/30/2026 (OOP Refactored)")
+    print("Contributors: Yuanzhuo Zhang and Zhoulai Fu")
     print("*" * 50)
 
 def get_parser():
     """Create and return argument parser."""
-    parser = argparse.ArgumentParser(prog='XSat', allow_abbrev=False)
+    parser = argparse.ArgumentParser(prog='stagesat', allow_abbrev=False)
     parser.add_argument('smt2_file', help='specify the smt2 file to analyze.',
                         type=argparse.FileType('r'))
     parser.add_argument('-v', '--version', action='version', version='%(prog) version 12/18/2015')
@@ -207,7 +207,7 @@ def get_parser():
 if __name__ == "__main__":
     parser = get_parser()
     if len(sys.argv[1:]) == 0:
-        print_xsat_info()
+        print_stagesat_info()
         parser.print_help()
         parser.exit()
     args = parser.parse_args()
@@ -219,7 +219,7 @@ if __name__ == "__main__":
         expr_z3 = z3.simplify(expr_z3, arith_lhs=False, hoist_cmul=False)
     except z3.Z3Exception as e:
         print(e)
-        sys.stderr.write("[Xsat] The Z3 front-end crashes.\n")
+        sys.stderr.write("[stagesat] The Z3 front-end crashes.\n")
         sys.exit(1)
     generator = CodeGenerator()
     if args.square:

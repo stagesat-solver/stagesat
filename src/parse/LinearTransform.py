@@ -181,7 +181,7 @@ class LinearTransform:
         elif z3.is_int(expr_z3):
             ret = sympy.Integer(str(expr_z3))
         else:
-            raise NotImplementedError("[XSat] type not considered")
+            raise NotImplementedError("[stagesat] type not considered")
         return ret
 
     def _parse_z3_linear_expr(self, expr):

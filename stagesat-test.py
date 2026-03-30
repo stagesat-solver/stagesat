@@ -9,7 +9,7 @@ def run_xsat(folder, filename):
     try:
         subprocess.run(['timeout', '300s', 'make', f'IN={folder}/{filename}'],
                        capture_output=True, text=True, check=True)
-        result = subprocess.run(['timeout', '1200s', 'python', 'xsat.py', '--bench', '--time'],
+        result = subprocess.run(['timeout', '1200s', 'python', 'stagesat.py', '--bench', '--time'],
                                 capture_output=True, text=True, check=True)
         lines = result.stdout.strip().split('\n')
         return (lines[0].strip().lower() if lines[0].strip().lower() in ['sat', 'unsat'] else None,
@@ -79,4 +79,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# python xsat2-test.py experiment/small.csv Benchmarks/griggio-benchmarks/small/
+# python stagesat-test.py experiment/small.csv Benchmarks/griggio-benchmarks/small/
