@@ -17,6 +17,8 @@ First, compile the Cython extensions:
 make cython
 ```
 
+Note: If you modify `src/optimization/mcmc.pyx`, please rerun this command.
+
 **Run a benchmark**
 
 Consider a benchmark located at `Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2`. The first command below compiles the benchmark into a C shared object, and the second command invokes an optimization backend to solve it:

@@ -140,6 +140,7 @@ def mcmc(args, int i, stop_event):
     cdef cnp.ndarray f64_positions = np.where(~f32_mask)[0].astype(np.int64)
     cdef cnp.ndarray best_X_star = np.zeros(foo_square.dim)
     cdef double best_R_star = float('inf')
+    cdef bint r3_triggered = False
     callback = BasinHoppingCallback(stop_event)
     cdef int round_num
     cdef cnp.ndarray sp, sp2, sp3, X_star
@@ -172,7 +173,9 @@ def mcmc(args, int i, stop_event):
         X_star = scale(res.x, i)
         # Skip if result is too poor
         if res.fun >= args.round1_threshold:
-            continue
+            force_proceed = (round_num / args.nStartOver) > args.round1_force and not r3_triggered
+            if not force_proceed:
+                continue
         ########################################################################
         # Optional Round 2: ULP-based refinement when round 1 is not good enough
         ########################################################################
@@ -208,6 +211,7 @@ def mcmc(args, int i, stop_event):
         ########################################################################
         # Round 3: Floating point neighborhood search
         ########################################################################
+        r3_triggered = True
         if args.showTime:
             print("[stagesat] round3_move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         if stop_event.is_set():
