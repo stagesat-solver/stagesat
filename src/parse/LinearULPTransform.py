@@ -43,6 +43,8 @@ class LinearULPTransform(LinearTransform):
         Return canonical (x, a, b, y, ccoef, d) for  a*x + b = c*y + d.
         (x or y can be None when only one variable appears.)
         """
+        if self._contains_negative_zero(lhs) or self._contains_negative_zero(rhs):
+            return None
         self.has_float = False
         self.has_double = False
         lhs_c, lhs_k = self._parse_z3_linear_expr(lhs)

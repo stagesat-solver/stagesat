@@ -13,6 +13,22 @@ def is_fpMul(a):
 def is_RNE(a):
     return a.decl().kind() == z3.Z3_OP_FPA_RM_NEAREST_TIES_TO_EVEN
 
+def get_rounding_mode_c_constant(a):
+    """Return the C <fenv.h> rounding constant for a Z3 rounding mode expression.
+    Exits if RNA (roundNearestTiesToAway) is encountered — no standard C equivalent."""
+    kind = a.decl().kind()
+    if kind == z3.Z3_OP_FPA_RM_NEAREST_TIES_TO_AWAY:
+        raise SystemExit(
+            "[stagesat] ERROR: Rounding mode RNA (roundNearestTiesToAway) "
+            "has no C equivalent and is not supported.")
+    mapping = {
+        z3.Z3_OP_FPA_RM_NEAREST_TIES_TO_EVEN: "FE_TONEAREST",
+        z3.Z3_OP_FPA_RM_TOWARD_POSITIVE:       "FE_UPWARD",
+        z3.Z3_OP_FPA_RM_TOWARD_NEGATIVE:       "FE_DOWNWARD",
+        z3.Z3_OP_FPA_RM_TOWARD_ZERO:           "FE_TOWARDZERO",
+    }
+    return mapping.get(kind, None)
+
 def is_rounding_mode(a):
     """Check if expression is a floating-point rounding mode."""
     kind = a.decl().kind()

@@ -6,6 +6,7 @@ class CodeTemplate:
         return """#include <Python.h>
     #include "stagesat.h"
     #include <math.h>
+    #include <fenv.h>
 
     %(matrix_functions)s
 
@@ -17,7 +18,8 @@ class CodeTemplate:
       %(x_body)s
 
       %(objective_computation)s
-
+      
+      %(rm_restore)s
       return Py_BuildValue("d",%(x_expr)s);
     }
 
@@ -61,6 +63,8 @@ class CodeTemplate:
         return """#include <Python.h>
     #include "stagesat.h"
     #include <math.h>
+    #include <fenv.h>
+    
     %(ulp_projection)s
     %(ulp_f32_projection)s
     static PyObject* R(PyObject* self, PyObject *args){
@@ -71,7 +75,8 @@ class CodeTemplate:
       %(x_body)s
 
       %(objective_computation)s
-
+      
+      %(rm_restore)s
       return Py_BuildValue("d",%(x_expr)s);
     }
 
@@ -113,6 +118,7 @@ class CodeTemplate:
         template = """#include <Python.h>
     #include "stagesat.h"
     #include <math.h>
+    #include <fenv.h>
 
     static PyObject* R(PyObject* self, PyObject *args){
       return PyFloat_FromDouble(0.0);  // Fixed: Must return PyObject*, not double

@@ -10,17 +10,22 @@ DEBUG=False
 
 class VerifyGenerator():
     def __init__(self):
-        return
+        self.rounding_modes_used = set()
+
     def _get_template(self):
         template = """#include <Python.h>
     #include "stagesat.h"
     #include <math.h>
+    #include <fenv.h>
+    
     static PyObject* R(PyObject* self, PyObject *args){
     
       %(var_declarations)s
       if (!PyArg_ParseTuple(args,"%(parse_formats)s", %(var_refs)s))
         return NULL;
       %(x_body)s
+      
+      %(rm_restore)s
       return Py_BuildValue("d",%(x_expr)s);
     }
     
@@ -131,6 +136,8 @@ class VerifyGenerator():
                         str_ret = "INFINITY"
                     elif expr_z3.isInf() and expr_z3.decl().kind() == z3.Z3_OP_FPA_MINUS_INF:
                         str_ret = "- INFINITY"
+                    elif expr_z3.isZero():
+                        str_ret = "-0.0" if expr_z3.sign() else "0.0"
                     else:
                         # Handle normal values
                         try:
@@ -190,8 +197,12 @@ class VerifyGenerator():
             if DEBUG:
                 print("-- Branch _is_fpFP")
             assert expr_z3.num_args() == 2
-            if not (z3_util.is_RNE(expr_z3.arg(0))):
-                warnings.warn(f"WARNING!!! I expect the first argument of fpFP is RNE, but it is {expr_z3.arg(0)}")
+            rm_arg = expr_z3.arg(0)
+            c_rm = z3_util.get_rounding_mode_c_constant(rm_arg)
+            if c_rm is None:
+                warnings.warn(f"WARNING!!! fpFP rounding mode unrecognised, using FE_TONEAREST: {rm_arg}")
+                c_rm = "FE_TONEAREST"
+            self.rounding_modes_used.add(c_rm)
             x = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             if expr_z3.sort() == z3.FPSort(8, 24):
                 toAppend = "float %s = (float)(%s);" % (verification.var_name(expr_z3), x)
@@ -229,9 +240,13 @@ class VerifyGenerator():
         if z3_util.is_fpMul(expr_z3):
             if DEBUG:
                 print("-- Branch _is_fpMul")
-            if not z3_util.is_RNE(expr_z3.arg(0)):
-                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
             assert expr_z3.num_args() == 3
+            rm_arg = expr_z3.arg(0)
+            c_rm = z3_util.get_rounding_mode_c_constant(rm_arg)
+            if c_rm is None:
+                warnings.warn(f"WARNING!!! Rounding mode unrecognised, using FE_TONEAREST. arg(0) = {rm_arg}")
+                c_rm = "FE_TONEAREST"
+            self.rounding_modes_used.add(c_rm)
             lhs = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             rhs = self._gen(expr_z3.arg(2), symbolTable, cache, result)
             if expr_type == 'float':
@@ -244,9 +259,13 @@ class VerifyGenerator():
         if z3_util.is_fpDiv(expr_z3):
             if DEBUG:
                 print("-- Branch _is_fpDiv")
-            if not z3_util.is_RNE(expr_z3.arg(0)):
-                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
             assert expr_z3.num_args() == 3
+            rm_arg = expr_z3.arg(0)
+            c_rm = z3_util.get_rounding_mode_c_constant(rm_arg)
+            if c_rm is None:
+                warnings.warn(f"WARNING!!! Rounding mode unrecognised, using FE_TONEAREST. arg(0) = {rm_arg}")
+                c_rm = "FE_TONEAREST"
+            self.rounding_modes_used.add(c_rm)
             lhs = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             rhs = self._gen(expr_z3.arg(2), symbolTable, cache, result)
             if expr_type == 'float':
@@ -259,9 +278,13 @@ class VerifyGenerator():
         if z3_util.is_fpAdd(expr_z3):
             if DEBUG:
                 print("-- Branch _is_fpAdd")
-            if not z3_util.is_RNE(expr_z3.arg(0)):
-                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
             assert expr_z3.num_args() == 3
+            rm_arg = expr_z3.arg(0)
+            c_rm = z3_util.get_rounding_mode_c_constant(rm_arg)
+            if c_rm is None:
+                warnings.warn(f"WARNING!!! Rounding mode unrecognised, using FE_TONEAREST. arg(0) = {rm_arg}")
+                c_rm = "FE_TONEAREST"
+            self.rounding_modes_used.add(c_rm)
             lhs = self._gen(expr_z3.arg(1), symbolTable, cache, result)
             rhs = self._gen(expr_z3.arg(2), symbolTable, cache, result)
             if expr_type == 'float':
@@ -387,6 +410,12 @@ class VerifyGenerator():
                 raise NotImplementedError("Unknown types in smt")
         x_expr = verification.var_name(expr_z3)   #the last var
         x_body = '\n  '.join(result)
+        non_rne = self.rounding_modes_used - {"FE_TONEAREST"}
+        rm_preamble = f"fesetround({next(iter(non_rne))});" if non_rne else ""
+        rm_restore = "fesetround(FE_TONEAREST);" if non_rne else ""
+        if rm_preamble:
+            x_body = rm_preamble + '\n  ' + x_body
+        self.rounding_modes_used = set()
         x_dim = len(symbolTable)
         return symbolTable, self._get_template() % {
             "var_declarations": "\n  ".join(var_declarations),
@@ -394,5 +423,6 @@ class VerifyGenerator():
             "var_refs": ", ".join(var_refs),
             "x_expr": x_expr,
             "x_dim": x_dim,
-            "x_body": x_body
+            "x_body": x_body,
+            "rm_restore": rm_restore,
         }

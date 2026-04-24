@@ -70,6 +70,10 @@ class CodeGenerator:
             else:
                 raise NotImplementedError("Unknown types in SMT")
         x_body = '\n  '.join(self.expr_generator.result)
+        rm_preamble = self.expr_generator.get_rounding_mode_preamble()
+        rm_restore = self.expr_generator.get_rounding_mode_restore()
+        if rm_preamble:
+            x_body = rm_preamble + '\n  ' + x_body
         x_dim = len(symbolTable)
         x_expr = "final_objective" if (linear_eq_constraints and square_code) else verification.var_name(expr_z3)
         code = self.template.get_template() % {
@@ -82,6 +86,7 @@ class CodeGenerator:
             "return_expr": x_expr,
             "x_dim": x_dim,
             "x_expr": x_expr,
+            "rm_restore": rm_restore
         }
         return symbolTable, code
 
@@ -146,6 +151,10 @@ class CodeGenerator:
             else:
                 raise NotImplementedError("Unknown types in SMT")
         x_body = '\n  '.join(self.expr_generator.result)
+        rm_preamble = self.expr_generator.get_rounding_mode_preamble()
+        rm_restore = self.expr_generator.get_rounding_mode_restore()
+        if rm_preamble:
+            x_body = rm_preamble + '\n  ' + x_body
         x_dim = len(symbolTable)
         x_expr = "final_objective" if linear_eq_constraints else verification.var_name(expr_z3)
         code = self.template.get_template_ulp() % {
@@ -159,6 +168,7 @@ class CodeGenerator:
             "return_expr": return_expr,
             "x_dim": x_dim,
             "x_expr": x_expr,
+            "rm_restore": rm_restore
         }
         return symbolTable, code
 

@@ -21,6 +21,7 @@ class ExpressionGenerator:
         self.inside_or = False
         # Linearity analysis
         self.linearity_info = {}  # Maps expr_id -> (is_linear, expr_str)
+        self.rounding_modes_used = set()
 
     def reset(self):
         """Reset the generator state."""
@@ -32,6 +33,23 @@ class ExpressionGenerator:
         self.other_constraints = []
         self.inside_or = False
         self.linearity_info = {}
+        self.rounding_modes_used = set()
+
+    def get_rounding_mode_preamble(self):
+        """Return a fesetround() C statement if any non-RNE rounding mode was used."""
+        non_rne = self.rounding_modes_used - {"FE_TONEAREST"}
+        if not non_rne:
+            return ""
+        if len(non_rne) > 1:
+            warnings.warn(
+                f"WARNING!!! Multiple distinct non-RNE rounding modes used: {non_rne}. "
+                f"Only one fesetround() will be emitted — results may be incorrect.")
+        return f"fesetround({next(iter(non_rne))});"
+
+    def get_rounding_mode_restore(self):
+        """Return fesetround(FE_TONEAREST) if a non-default mode was set."""
+        non_rne = self.rounding_modes_used - {"FE_TONEAREST"}
+        return "fesetround(FE_TONEAREST);" if non_rne else ""
 
     def is_linear(self, expr_z3, symbolTable=None, cache=None):
         """
@@ -282,6 +300,8 @@ class ExpressionGenerator:
                     str_ret = "INFINITY"
                 elif expr_z3.isInf() and expr_z3.decl().kind() == z3.Z3_OP_FPA_MINUS_INF:
                     str_ret = "- INFINITY"
+                elif expr_z3.isZero():
+                    str_ret = "-0.0" if expr_z3.sign() else "0.0"
                 else:
                     try:
                         str_ret = str(sympy.Float(str(expr_z3), 17))
@@ -376,18 +396,17 @@ class ExpressionGenerator:
         """Handle arithmetic operations (add, sub, mul, div)."""
         sort_z3 = expr_z3.decl().kind()
         expr_type = 'float' if expr_z3.sort() == z3.FPSort(8, 24) else 'double'
-        if not z3_util.is_RNE(expr_z3.arg(0)):
-            warnings.warn(f"WARNING!!! arg(0) is not RNE but treated as RNE. arg(0) = {expr_z3.arg(0)}")
+        rm_arg = expr_z3.arg(0)
+        c_rm = z3_util.get_rounding_mode_c_constant(rm_arg)
+        if c_rm is None:
+            warnings.warn(
+                f"WARNING!!! arg(0) rounding mode unrecognised, "
+                f"falling back to FE_TONEAREST. arg(0) = {rm_arg}")
+            c_rm = "FE_TONEAREST"
+        self.rounding_modes_used.add(c_rm)
         assert expr_z3.num_args() == 3
         lhs = self._gen_recursive(expr_z3.arg(1))
         rhs = self._gen_recursive(expr_z3.arg(2))
-        op_map = {
-            z3.Z3_OP_FPA_ADD: '+',
-            z3.Z3_OP_FPA_SUB: '-',
-            z3.Z3_OP_FPA_MUL: '*',
-            z3.Z3_OP_FPA_DIV: '/'
-        }
-        # Handle fpMul, fpDiv, fpAdd specifically
         if z3_util.is_fpMul(expr_z3):
             op = '*'
         elif z3_util.is_fpDiv(expr_z3):
@@ -398,25 +417,33 @@ class ExpressionGenerator:
             op = '-'
         else:
             raise NotImplementedError("bugs in _handle_arithmetic")
+        var = verification.var_name(expr_z3)
         if expr_type == 'float':
-            toAppend = f"float {verification.var_name(expr_z3)} = (float)({lhs}) {op} (float)({rhs});"
+            toAppend = f"float {var} = (float)({lhs}) {op} (float)({rhs});"
         else:
-            toAppend = f"double {verification.var_name(expr_z3)} = {lhs} {op} {rhs};"
+            toAppend = f"double {var} = {lhs} {op} {rhs};"
         self.result.append(toAppend)
-        return verification.var_name(expr_z3)
+        return var
 
     def handle_cast(self, expr_z3):
         """Handle type casting operations."""
         assert expr_z3.num_args() == 2
-        if not z3_util.is_RNE(expr_z3.arg(0)):
-            warnings.warn(f"WARNING!!! First argument of fpFP is not RNE: {expr_z3.arg(0)}")
+        rm_arg = expr_z3.arg(0)
+        c_rm = z3_util.get_rounding_mode_c_constant(rm_arg)
+        if c_rm is None:
+            warnings.warn(
+                f"WARNING!!! fpFP rounding mode unrecognised, "
+                f"falling back to FE_TONEAREST: {rm_arg}")
+            c_rm = "FE_TONEAREST"
+        self.rounding_modes_used.add(c_rm)
         x = self._gen_recursive(expr_z3.arg(1))
+        var = verification.var_name(expr_z3)
         if expr_z3.sort() == z3.FPSort(8, 24):
-            toAppend = f"float {verification.var_name(expr_z3)} = (float)({x});"
+            toAppend = f"float {var} = (float)({x});"
         else:
-            toAppend = f"double {verification.var_name(expr_z3)} = (double)({x});"
+            toAppend = f"double {var} = (double)({x});"
         self.result.append(toAppend)
-        return verification.var_name(expr_z3)
+        return var
 
     def handle_and(self, expr_z3):
         """Handle AND operations."""

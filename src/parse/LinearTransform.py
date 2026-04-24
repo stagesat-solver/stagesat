@@ -148,6 +148,20 @@ class LinearTransform:
             ret = num if den == 1 else f"({num})/{den}"
         return ret
 
+    @staticmethod
+    def _contains_negative_zero(expr) -> bool:
+        """
+        Return True if the Z3 expression contains a negative-zero FP literal.
+        Fraction arithmetic cannot represent -0.0, so any constraint containing
+        one must be handled outside the linear projection pipeline.
+        """
+        if z3.is_const(expr) and isinstance(expr, z3.FPNumRef):
+            return expr.isZero() and bool(expr.sign())
+        for child in expr.children():
+            if LinearTransform._contains_negative_zero(child):
+                return True
+        return False
+
     def _is_variable(self, expr):
         """Check if expression is a variable (constant symbol, not a value and not a rounding mode)"""
         return is_const(expr) and not is_fp_value(expr) and not z3_util.is_rounding_mode(expr)

@@ -55,7 +55,7 @@ build/R_square/foo_square.so: include/R_square/stagesat.h build/foo_square.c
 	@clang -O3 -fPIC build/foo_square.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_square \
 		-DMODULE_NAME=\"foo_square\" \
-		-fbracket-depth=3000
+		-fbracket-depth=3000 -frounding-math
 build/R_square/foo_square_large.so: include/R_square/stagesat_large.h build/foo_square.c
 	@echo [stagesat]Compiling foo_square_large.so with stagesat_large.h
 	@mkdir -p build/R_square
@@ -63,7 +63,7 @@ build/R_square/foo_square_large.so: include/R_square/stagesat_large.h build/foo_
 	@clang -O3 -fPIC build/foo_square_large_tmp.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_square $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_square_large \
 		-DMODULE_NAME=\"foo_square_large\" \
-		-fbracket-depth=3000
+		-fbracket-depth=3000 -frounding-math
 	@rm -f build/foo_square_large_tmp.c
 
 compile_ulp: build/R_ulp/foo_ulp.so
@@ -76,7 +76,7 @@ build/R_ulp/foo_ulp.so: include/R_ulp/stagesat.h $(IN)
 	@clang -O3 -fPIC build/foo_ulp.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_ulp $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_ulp \
 		-DMODULE_NAME=\"foo_ulp\" \
-		-fbracket-depth=3000
+		-fbracket-depth=3000 -frounding-math
 
 compile_verify: build/R_verify/foo_verify.so
 build/R_verify/foo_verify.so: include/R_verify/stagesat.h $(IN)
@@ -88,7 +88,7 @@ build/R_verify/foo_verify.so: include/R_verify/stagesat.h $(IN)
 	@clang -O3 -fPIC build/foo_verify.c $(DLIBFLAG) -o $@ $(PYTHONINC) -I include/R_verify $(PYTHONLIB) \
 		-DPyInit_foo=PyInit_foo_verify \
 		-DMODULE_NAME=\"foo_verify\" \
-		-fbracket-depth=3000
+		-fbracket-depth=3000 -frounding-math
 
 compile: compile_square compile_ulp compile_verify
 
