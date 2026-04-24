@@ -301,26 +301,42 @@ class VerifyGenerator():
             if DEBUG:
                 print("-- Branch _is_not")
             assert expr_z3.num_args() == 1
-            if not (expr_z3.arg(0).num_args() == 2):
-                warnings.warn(f"WARNING!!! arg(0) is not RNE but is treated as RNE. arg(0) = {expr_z3.arg(0)}")
-            op1 = self._gen(expr_z3.arg(0).arg(0), symbolTable, cache, result)
-            op2 = self._gen(expr_z3.arg(0).arg(1), symbolTable, cache, result)
-            lhs_type = self._get_operand_type(expr_z3.arg(0).arg(0), symbolTable, cache)
-            rhs_type = self._get_operand_type(expr_z3.arg(0).arg(1), symbolTable, cache)
-            if z3_util.is_ge(expr_z3.arg(0)):
+            inner = expr_z3.arg(0)
+            # De Morgan: not(a or b) = and(not a, not b)
+            if z3.is_or(inner):
+                new_expr = z3.And(*[z3.Not(inner.arg(i)) for i in range(inner.num_args())])
+                result_var = self._gen(new_expr, symbolTable, cache, result)
+                toAppend = "double %s = %s;" % (verification.var_name(expr_z3), result_var)
+                result.append(toAppend)
+                return verification.var_name(expr_z3)
+            # De Morgan: not(a and b) = or(not a, not b)
+            if z3.is_and(inner):
+                new_expr = z3.Or(*[z3.Not(inner.arg(i)) for i in range(inner.num_args())])
+                result_var = self._gen(new_expr, symbolTable, cache, result)
+                toAppend = "double %s = %s;" % (verification.var_name(expr_z3), result_var)
+                result.append(toAppend)
+                return verification.var_name(expr_z3)
+            if not (inner.num_args() == 2):
+                warnings.warn(f"WARNING!!! arg(0) num_args != 2: {inner}")
+            op1 = self._gen(inner.arg(0), symbolTable, cache, result)
+            op2 = self._gen(inner.arg(1), symbolTable, cache, result)
+            lhs_type = self._get_operand_type(inner.arg(0), symbolTable, cache)
+            rhs_type = self._get_operand_type(inner.arg(1), symbolTable, cache)
+            if z3_util.is_ge(inner):
                 func = self._get_comparison_function("DLT", lhs_type, rhs_type)
-            elif z3_util.is_gt(expr_z3.arg(0)):
+            elif z3_util.is_gt(inner):
                 func = self._get_comparison_function("DLE", lhs_type, rhs_type)
-            elif z3_util.is_le(expr_z3.arg(0)):
+            elif z3_util.is_le(inner):
                 func = self._get_comparison_function("DGT", lhs_type, rhs_type)
-            elif z3_util.is_lt(expr_z3.arg(0)):
+            elif z3_util.is_lt(inner):
                 func = self._get_comparison_function("DGE", lhs_type, rhs_type)
-            elif z3_util.is_eq(expr_z3.arg(0)):
+            elif z3_util.is_eq(inner):
                 func = self._get_comparison_function("DNE", lhs_type, rhs_type)
-            elif z3_util.is_distinct(expr_z3.arg(0)):
+            elif z3_util.is_distinct(inner):
                 func = self._get_comparison_function("DEQ", lhs_type, rhs_type)
             else:
-                raise NotImplementedError("Not implemented case")
+                raise NotImplementedError(
+                    f"Not implemented case in NOT handler for inner expr kind: {inner.decl().kind()}")
             a = "%s(%s,%s)" % (func, op1, op2)
             toAppend = "double %s = %s;" % (verification.var_name(expr_z3), a)
             result.append(toAppend)

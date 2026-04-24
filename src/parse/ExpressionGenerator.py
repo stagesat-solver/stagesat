@@ -448,17 +448,31 @@ class ExpressionGenerator:
     def handle_not(self, expr_z3):
         """Handle NOT operations."""
         assert expr_z3.num_args() == 1
-        if expr_z3.arg(0).num_args() != 2:
-            warnings.warn(f"WARNING!!! arg(0) num_args != 2: {expr_z3.arg(0)}")
-        op1 = self._gen_recursive(expr_z3.arg(0).arg(0))
-        op2 = self._gen_recursive(expr_z3.arg(0).arg(1))
-        lhs_type = self.get_operand_type(expr_z3.arg(0).arg(0), self.symbolTable, self.cache)
-        rhs_type = self.get_operand_type(expr_z3.arg(0).arg(1), self.symbolTable, self.cache)
-        lhs_linear = self.is_linear(expr_z3.arg(0).arg(0), self.symbolTable, self.cache)
-        rhs_linear = self.is_linear(expr_z3.arg(0).arg(1), self.symbolTable, self.cache)
+        inner = expr_z3.arg(0)
+        # De Morgan: not(a or b) = and(not a, not b)
+        if z3.is_or(inner):
+            new_expr = z3.And(*[z3.Not(inner.arg(i)) for i in range(inner.num_args())])
+            result_var = self._gen_recursive(new_expr)
+            toAppend = f"double {verification.var_name(expr_z3)} = {result_var};"
+            self.result.append(toAppend)
+            return verification.var_name(expr_z3)
+        # De Morgan: not(a and b) = or(not a, not b)
+        if z3.is_and(inner):
+            new_expr = z3.Or(*[z3.Not(inner.arg(i)) for i in range(inner.num_args())])
+            result_var = self._gen_recursive(new_expr)
+            toAppend = f"double {verification.var_name(expr_z3)} = {result_var};"
+            self.result.append(toAppend)
+            return verification.var_name(expr_z3)
+        if inner.num_args() != 2:
+            warnings.warn(f"WARNING!!! arg(0) num_args != 2: {inner}")
+        op1 = self._gen_recursive(inner.arg(0))
+        op2 = self._gen_recursive(inner.arg(1))
+        lhs_type = self.get_operand_type(inner.arg(0), self.symbolTable, self.cache)
+        rhs_type = self.get_operand_type(inner.arg(1), self.symbolTable, self.cache)
+        lhs_linear = self.is_linear(inner.arg(0), self.symbolTable, self.cache)
+        rhs_linear = self.is_linear(inner.arg(1), self.symbolTable, self.cache)
         is_linear = lhs_linear and rhs_linear
         expr_id = expr_z3.get_id()
-        # Determine which negated comparison this is
         comparison_map = {
             'is_ge': ('DLT', 'CONSTRAINT_NOT_GE'),
             'is_gt': ('DLE', 'CONSTRAINT_NOT_GT'),
@@ -469,13 +483,14 @@ class ExpressionGenerator:
         }
         for check_name, (func_base, constraint_type) in comparison_map.items():
             check_func = getattr(z3_util, check_name)
-            if check_func(expr_z3.arg(0)):
+            if check_func(inner):
                 func = self.get_comparison_function(func_base, lhs_type, rhs_type)
                 self.linearity_info[expr_id] = (
                     is_linear, f"{constraint_type}(lhs={lhs_linear},rhs={rhs_linear})")
                 break
         else:
-            raise NotImplementedError("Not implemented case in NOT handler")
+            raise NotImplementedError(
+                f"Not implemented case in NOT handler for inner expr kind: {inner.decl().kind()}")
         if not self.inside_or:
             self.other_constraints.append((expr_id, verification.var_name(expr_z3)))
         comment = f" // {'LINEAR' if is_linear else 'NON-LINEAR'}"
