@@ -463,6 +463,12 @@ class ExpressionGenerator:
             toAppend = f"double {verification.var_name(expr_z3)} = {result_var};"
             self.result.append(toAppend)
             return verification.var_name(expr_z3)
+        # double negation  not(not(expr)) → reuse expr's distance value ──
+        if z3.is_not(inner):
+            result_var = self._gen_recursive(inner.arg(0))
+            toAppend = f"double {verification.var_name(expr_z3)} = {result_var};"
+            self.result.append(toAppend)
+            return verification.var_name(expr_z3)
         if inner.num_args() != 2:
             warnings.warn(f"WARNING!!! arg(0) num_args != 2: {inner}")
         op1 = self._gen_recursive(inner.arg(0))

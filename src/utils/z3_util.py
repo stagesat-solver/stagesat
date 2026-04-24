@@ -1,4 +1,5 @@
 import z3
+import sys
 
 def is_fpNeg(a):
     return a.decl().kind() == z3.Z3_OP_FPA_NEG
@@ -15,13 +16,24 @@ def is_RNE(a):
 def is_rounding_mode(a):
     """Check if expression is a floating-point rounding mode."""
     kind = a.decl().kind()
-    return kind in [
+    if kind in [
         z3.Z3_OP_FPA_RM_NEAREST_TIES_TO_EVEN,
         z3.Z3_OP_FPA_RM_NEAREST_TIES_TO_AWAY,
         z3.Z3_OP_FPA_RM_TOWARD_POSITIVE,
         z3.Z3_OP_FPA_RM_TOWARD_NEGATIVE,
         z3.Z3_OP_FPA_RM_TOWARD_ZERO
-    ]
+    ]:
+        return True
+    # Uninterpreted RoundingMode variable — not supported
+    if str(a.sort()) == 'RoundingMode':
+        print(
+            f"[stagesat] Unsupported: '{a.decl().name()}' is an uninterpreted "
+            "RoundingMode variable. StageSAT cannot optimize over RoundingMode. "
+            "Exiting.",
+            file=sys.stderr
+        )
+        sys.exit(1)
+    return False
 
 def is_fpAdd(a):
     return a.decl().kind() == z3.Z3_OP_FPA_ADD
