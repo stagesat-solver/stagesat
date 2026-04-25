@@ -30,26 +30,11 @@ def get_rounding_mode_c_constant(a):
     return mapping.get(kind, None)
 
 def is_rounding_mode(a):
-    """Check if expression is a floating-point rounding mode."""
-    kind = a.decl().kind()
-    if kind in [
-        z3.Z3_OP_FPA_RM_NEAREST_TIES_TO_EVEN,
-        z3.Z3_OP_FPA_RM_NEAREST_TIES_TO_AWAY,
-        z3.Z3_OP_FPA_RM_TOWARD_POSITIVE,
-        z3.Z3_OP_FPA_RM_TOWARD_NEGATIVE,
-        z3.Z3_OP_FPA_RM_TOWARD_ZERO
-    ]:
-        return True
-    # Uninterpreted RoundingMode variable — not supported
-    if str(a.sort()) == 'RoundingMode':
-        print(
-            f"[stagesat] Unsupported: '{a.decl().name()}' is an uninterpreted "
-            "RoundingMode variable. StageSAT cannot optimize over RoundingMode. "
-            "Exiting.",
-            file=sys.stderr
-        )
-        sys.exit(1)
-    return False
+    return isinstance(a.sort(), z3.FPRMSortRef)
+
+def is_uninterpreted_rounding_mode(a):
+    """True only for free (uninterpreted) RoundingMode variables."""
+    return isinstance(a.sort(), z3.FPRMSortRef) and is_variable(a)
 
 def is_fpAdd(a):
     return a.decl().kind() == z3.Z3_OP_FPA_ADD

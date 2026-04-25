@@ -35,6 +35,13 @@ class ExpressionGenerator:
         self.linearity_info = {}
         self.rounding_modes_used = set()
 
+    @staticmethod
+    def _has_uninterpreted_rm(expr_z3) -> bool:
+        """Return True if arg(0) of an FP arithmetic node is an uninterpreted RM variable."""
+        if expr_z3.num_args() < 1:
+            return False
+        return z3_util.is_uninterpreted_rounding_mode(expr_z3.arg(0))
+
     def get_rounding_mode_preamble(self):
         """Return a fesetround() C statement if any non-RNE rounding mode was used."""
         non_rne = self.rounding_modes_used - {"FE_TONEAREST"}
@@ -85,12 +92,18 @@ class ExpressionGenerator:
         sort_z3 = expr_z3.decl().kind()
         # Addition/Subtraction
         if z3_util.is_fpAdd(expr_z3) and expr_z3.num_args() >= 3:
+            if self._has_uninterpreted_rm(expr_z3):
+                self.linearity_info[expr_id] = (False, "ADD_UNINTERP_RM")
+                return False
             lhs_linear = self.is_linear(expr_z3.arg(1), symbolTable, cache)
             rhs_linear = self.is_linear(expr_z3.arg(2), symbolTable, cache)
             is_linear = lhs_linear and rhs_linear
             self.linearity_info[expr_id] = (is_linear, "ADD")
             return is_linear
         if sort_z3 == z3.Z3_OP_FPA_SUB and expr_z3.num_args() >= 3:
+            if self._has_uninterpreted_rm(expr_z3):
+                self.linearity_info[expr_id] = (False, "SUB_UNINTERP_RM")
+                return False
             lhs_linear = self.is_linear(expr_z3.arg(1), symbolTable, cache)
             rhs_linear = self.is_linear(expr_z3.arg(2), symbolTable, cache)
             is_linear = lhs_linear and rhs_linear
@@ -98,6 +111,9 @@ class ExpressionGenerator:
             return is_linear
         # Multiplication
         if z3_util.is_fpMul(expr_z3) and expr_z3.num_args() >= 3:
+            if self._has_uninterpreted_rm(expr_z3):
+                self.linearity_info[expr_id] = (False, "MUL_UNINTERP_RM")
+                return False
             lhs = expr_z3.arg(1)
             rhs = expr_z3.arg(2)
             lhs_is_const = z3_util.is_value(lhs)
@@ -109,6 +125,9 @@ class ExpressionGenerator:
             return is_linear
         # Division
         if z3_util.is_fpDiv(expr_z3) and expr_z3.num_args() >= 3:
+            if self._has_uninterpreted_rm(expr_z3):
+                self.linearity_info[expr_id] = (False, "DIV_UNINTERP_RM")
+                return False
             lhs = expr_z3.arg(1)
             rhs = expr_z3.arg(2)
             rhs_is_const = z3_util.is_value(rhs)
