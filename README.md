@@ -33,6 +33,9 @@ Consider the benchmark at `Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2`. T
 make IN=Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2
 
 python stagesat.py --bench --time
+
+# only for verdict
+python stagesat.py --bench
 ```
 
 To view debug information, run the following command instead:
