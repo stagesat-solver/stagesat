@@ -4,9 +4,15 @@ A floating-point constraint solver via staged optimization.
 
 ## Dependencies
 
+StageSAT requires Python 3.11 or later. The commands below install its dependencies in a Conda environment.
 Install the required dependencies:
 ```bash
+conda create -n stagesat python=3.11
+
+conda activate stagesat
+
 pip install -r requirements.txt
+
 apt install clang
 ```
 
@@ -21,10 +27,11 @@ Note: If you modify `src/optimization/mcmc.pyx`, please rerun this command.
 
 **Run a benchmark**
 
-Consider a benchmark located at `Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2`. The first command below compiles the benchmark into a C shared object, and the second command invokes an optimization backend to solve it:
+Consider the benchmark at `Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2`. The first command below compiles the benchmark into a C shared object. The second command invokes an optimization backend to solve the benchmark and reports the satisfiability verdict and the solve time in seconds.
 
 ```
 make IN=Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2
+
 python stagesat.py --bench --time
 ```
 
