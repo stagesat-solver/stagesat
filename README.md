@@ -13,7 +13,7 @@ conda activate stagesat
 
 pip install -r requirements.txt
 
-apt install clang
+sudo apt install clang
 ```
 
 ## Usage
@@ -69,3 +69,15 @@ Results will be stored in `experiment/large.csv`.
 | [Bitwuzla](https://github.com/bitwuzla/bitwuzla) | [v0.8.2](https://github.com/bitwuzla/bitwuzla/releases/tag/0.8.2) |
 |       [Z3](https://github.com/Z3Prover/z3)       | [v4.8.12](https://github.com/Z3Prover/z3/releases/tag/z3-4.8.12) |
 |       [MathSAT](https://mathsat.fbk.eu/)       | [v5.6.12](https://mathsat.fbk.eu/downloadall.html) |
+
+## Installation from Package Repositories (Beta)
+
+Install StageSAT from PyPI and test the installation using an SMT-LIB input file:
+
+```bash
+sudo apt install clang
+
+python -m pip install stagesat==0.1.0
+
+stagesat /path/to/input.smt2 --bench --time
+```
