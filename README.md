@@ -29,7 +29,7 @@ Note: If you modify `src/optimization/mcmc.pyx`, please rerun this command.
 
 Consider the benchmark at `Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2`. The first command below compiles the benchmark into a C shared object. The second command invokes an optimization backend to solve the benchmark and reports the satisfiability verdict and the solve time in seconds.
 
-```
+```bash
 make IN=Benchmarks/griggio-benchmarks/small/sin2.c.5.smt2
 
 python stagesat.py --bench --time
@@ -39,14 +39,14 @@ python stagesat.py --bench
 ```
 
 To view debug information, run the following command instead:
-```
+```bash
 python stagesat.py
 ```
 
 **Run a benchmark suite**
 
 To run an entire benchmark suite (for example, `Benchmarks/griggio-benchmarks/large/`), use the following command:
-```
+```bash
 python stagesat-test.py experiment/large.csv Benchmarks/griggio-benchmarks/large
 ```
 
@@ -82,5 +82,9 @@ sudo apt install clang
 
 python -m pip install stagesat==0.1.0
 
+# for verdict and time
 stagesat /path/to/input.smt2 --bench --time
+
+# only for verdict
+stagesat /path/to/input.smt2 --bench
 ```
